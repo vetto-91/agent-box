@@ -131,7 +131,7 @@ services:
       - no-new-privileges:true
     read_only: true
     tmpfs:
-      - /tmp:rw,exec,nosuid,nodev,size=1g
+      - /tmp:rw,noexec,nosuid,nodev,size=1g
       - /run:rw,noexec,nosuid,nodev,size=64m
     working_dir: /workspace
     command: ["sleep", "infinity"]
