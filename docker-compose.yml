@@ -1,0 +1,190 @@
+name: agent-box
+
+services:
+  # ============================================================================
+  # 1. OPENSNITCH GUI (Interfaccia di approvazione isolata - Wayland & XWayland)
+  # - Gira come utente non-root rilevato automaticamente (${PUID}:${PGID})
+  # - Zero capabilities (cap_drop: ALL)
+  # - Nessuna interfaccia di rete (network_mode: "none")
+  # - Comunica con opensnitchd SOLO tramite Unix socket dedicato (/run/opensnitch)
+  #   non montato nel container dell'agente (impossibile da auto-approvare)
+  # ============================================================================
+  opensnitch-ui:
+    image: agent-box-ui:local
+    build:
+      context: ./ui
+      args:
+        PUID: ${PUID:-1000}
+        PGID: ${PGID:-1000}
+    container_name: agent-box-ui
+    user: "${PUID:-1000}:${PGID:-1000}"
+    privileged: false
+    network_mode: "none"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+      - /home/snitch/.cache:rw,noexec,nosuid,nodev,size=64m
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - DISPLAY=${DISPLAY:-:0}
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-0}
+      - XDG_RUNTIME_DIR=/run/user/${PUID:-1000}
+      - XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-wayland}
+      - QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-wayland;xcb}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/run/opensnitch/.Xauthority
+      - DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${PUID:-1000}/bus
+      - OPENSNITCH_SHOW_MAIN_WINDOW=${OPENSNITCH_SHOW_MAIN_WINDOW:-1}
+    volumes:
+      - ./opensnitch/socket:/run/opensnitch:rw
+      - ./opensnitch/ui-config:/home/snitch/.config/opensnitch:rw
+      - ./ui/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+      - ./ui/opensnitch-launcher.py:/usr/local/bin/opensnitch-launcher.py:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+      - ${XDG_RUNTIME_DIR:-/run/user/1000}:/run/user/${PUID:-1000}:ro
+    pids_limit: 128
+    mem_limit: 512m
+    restart: unless-stopped
+
+  # ============================================================================
+  # 2. SIDECAR FIREWALL (opensnitchd + iptables Fail-Closed)
+  # - Possiede il network namespace condiviso con l'agente
+  # - Non privilegiato (privileged: false), solo NET_ADMIN / NET_RAW / SYS_PTRACE
+  # - Politica di default DROP su OUTPUT (IPv4 e IPv6): se opensnitchd muore,
+  #   il traffico si blocca completamente (nessun --queue-bypass)
+  # ============================================================================
+  firewall:
+    image: agent-box-firewall:local
+    build:
+      context: ./firewall
+    container_name: agent-box-firewall
+    hostname: agent-box
+    depends_on:
+      - opensnitch-ui
+    privileged: false
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_PTRACE
+      - DAC_READ_SEARCH
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+      - /run/lock:rw,noexec,nosuid,nodev,size=16m
+    environment:
+      - AUTO_DNS=${AUTO_DNS:-1}
+      - AUTO_ALLOW_OLLAMA=${AUTO_ALLOW_OLLAMA:-0}
+      - OLLAMA_PORT=${OLLAMA_PORT:-11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./opensnitch/socket:/run/opensnitch:rw
+      - ./opensnitch/rules:/etc/opensnitchd/rules:rw
+    networks:
+      - agent_net
+    pids_limit: 128
+    mem_limit: 512m
+    restart: unless-stopped
+
+  # ============================================================================
+  # 3. AI AGENT SANDBOX (Ambiente di esecuzione per Claude Code, OpenCode, Aider)
+  # - Utente non-root rilevato automaticamente (${PUID}:${PGID})
+  # - Zero capabilities (cap_drop: ALL), no-new-privileges: true
+  # - Root filesystem in sola lettura (read_only: true)
+  # - Vede SOLO la cartella di lavoro montata in /workspace
+  # - Condivide il network namespace del container firewall (nessun bypass possibile)
+  # ============================================================================
+  agent:
+    image: agent-box-agent:local
+    build:
+      context: ./agent
+      args:
+        PUID: ${PUID:-1000}
+        PGID: ${PGID:-1000}
+    container_name: agent-box-sandbox
+    depends_on:
+      - firewall
+    user: "${PUID:-1000}:${PGID:-1000}"
+    privileged: false
+    network_mode: "service:firewall"
+    # Condivide il PID namespace con il firewall così OpenSnitch mostra il binario
+    # esatto (es. node, python3, curl). L'agente (UID non-root, cap_drop: ALL)
+    # non può inviare segnali né ispezionare i processi root del firewall.
+    # Commenta la riga seguente se preferisci isolamento totale anche dei PID.
+    pid: "service:firewall"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=1g
+      - /run:rw,noexec,nosuid,nodev,size=64m
+    working_dir: /workspace
+    command: ["sleep", "infinity"]
+    stdin_open: true
+    tty: true
+    environment:
+      - HOME=/home/agent
+      - USER=agent
+      - TERM=${TERM:-xterm-256color}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://host.docker.internal:11434}
+      - LOCAL_LLM_BASE_URL=${LOCAL_LLM_BASE_URL:-}
+      - LOCAL_LLM_API_KEY=${LOCAL_LLM_API_KEY:-local}
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-qwen2.5-coder:latest}
+      - LOCAL_LLM_NAME=${LOCAL_LLM_NAME:-Local LLM}
+      - AGENT_REGENERATE_LOCAL_CONFIG=${AGENT_REGENERATE_LOCAL_CONFIG:-0}
+      - NODE_TLS_REJECT_UNAUTHORIZED=${NODE_TLS_REJECT_UNAUTHORIZED:-1}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - XAI_API_KEY=${XAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+    volumes:
+      # UNICA directory del filesystem host esposta all'agente:
+      - ${WORKSPACE_DIR:-./workspace}:/workspace:rw
+      # File hosts modificabile dall'host (./hosts) e dall'agente (/etc/hosts):
+      - ./hosts:/etc/hosts:rw
+      # Certificati CA personalizzati/self-signed per endpoint HTTPS locali:
+      - ./certs:/etc/agent-box/certs:ro
+      # Home persistente isolata (tutta dentro la cartella del progetto):
+      - ./agent-home:/home/agent:rw
+    pids_limit: 512
+    mem_limit: ${AGENT_MEM_LIMIT:-8g}
+    cpus: ${AGENT_CPUS:-0}
+
+  # ============================================================================
+  # 4. OLLAMA (Opzionale - attivabile con: docker compose --profile ollama up -d)
+  # Se non hai già Ollama sull'host, puoi eseguirlo in questo container isolato.
+  # ============================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: agent-box-ollama
+    profiles:
+      - ollama
+    privileged: false
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./ollama-data:/root/.ollama:rw
+    networks:
+      - agent_net
+    restart: unless-stopped
+
+networks:
+  agent_net:
+    driver: bridge

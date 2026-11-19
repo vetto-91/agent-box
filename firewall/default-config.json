@@ -1,30 +1,25 @@
 {
     "Server": {
-        "Address": "127.0.0.1:50051",
-        "Authentication": {
-            "Type": "simple"
-        },
-        "LogFile": "/var/log/opensnitchd.log"
+        "Address": "unix:///run/opensnitch/osui.sock",
+        "LogFile": "/dev/stdout"
     },
     "DefaultAction": "deny",
     "DefaultDuration": "once",
     "InterceptUnknown": true,
     "ProcMonitorMethod": "proc",
     "LogLevel": 1,
-    "LogUTC": true,
-    "LogMicro": false,
-    "Firewall": "nftables",
+    "Firewall": "iptables",
     "FwOptions": {
         "ConfigPath": "/etc/opensnitchd/system-fw.json",
-        "MonitorInterval": "15s",
+        "MonitorInterval": "10s",
         "QueueBypass": false
     },
     "Rules": {
         "Path": "/etc/opensnitchd/rules/",
         "EnableChecksums": false
     },
-    "Internal": {
-        "GCPercent": 100,
-        "FlushConnsOnStart": true
+    "Stats": {
+        "MaxEvents": 250,
+        "MaxStats": 50
     }
 }

@@ -1,0 +1,50 @@
+#!/bin/sh
+set -eu
+
+# umask 0000 garantisce che il socket Unix /run/opensnitch/osui.sock sia
+# scrivibile anche da opensnitchd nel container firewall
+umask 0000
+
+CONFIG_DIR="/home/snitch/.config/opensnitch"
+CONFIG_FILE="${CONFIG_DIR}/settings.conf"
+SOCKET_PATH="/run/opensnitch/osui.sock"
+
+mkdir -p "${CONFIG_DIR}"
+rm -f "${SOCKET_PATH}" /tmp/osui.sock
+ln -sf "${SOCKET_PATH}" /tmp/osui.sock
+
+# Pre-configura (o aggiorna) opensnitch-ui per ascoltare sul socket condiviso col firewall
+cat <<EOF > "${CONFIG_FILE}"
+[global]
+server_address = unix://${SOCKET_PATH}
+address = unix://${SOCKET_PATH}
+default_timeout = 30
+default_action = 1
+default_duration = 0
+EOF
+
+# Rende il cookie Xauthority indipendente dall'hostname del container (FamilyWild)
+if [ -n "${XAUTHORITY:-}" ] && [ -s "${XAUTHORITY}" ] && command -v xauth >/dev/null 2>&1; then
+    XAUTH_TMP="/tmp/.Xauthority"
+    rm -f "${XAUTH_TMP}"
+    xauth -f "${XAUTHORITY}" nlist 2>/dev/null | sed -e 's/^..../ffff/' | xauth -f "${XAUTH_TMP}" nmerge - >/dev/null 2>&1 || cp -f "${XAUTHORITY}" "${XAUTH_TMP}" 2>/dev/null || true
+    if [ -s "${XAUTH_TMP}" ]; then
+        export XAUTHORITY="${XAUTH_TMP}"
+    fi
+fi
+
+# Rilevamento automatico Wayland vs XWayland/X11 dentro il container
+if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/${WAYLAND_DISPLAY}" ]; then
+    echo "[opensnitch-ui] Socket Wayland rilevato: ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}"
+    export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-wayland;xcb}"
+elif [ -z "${QT_QPA_PLATFORM:-}" ] || [ "${QT_QPA_PLATFORM}" = "wayland;xcb" ]; then
+    echo "[opensnitch-ui] Socket Wayland non trovato in ${XDG_RUNTIME_DIR:-}/${WAYLAND_DISPLAY:-}, uso X11/XWayland (xcb) su DISPLAY=${DISPLAY:-:0}"
+    export QT_QPA_PLATFORM="xcb"
+fi
+
+echo "[opensnitch-ui] Utente: $(id)"
+echo "[opensnitch-ui] QT_QPA_PLATFORM=${QT_QPA_PLATFORM}"
+echo "[opensnitch-ui] Finestra principale all'avvio: ${OPENSNITCH_SHOW_MAIN_WINDOW:-1}"
+echo "[opensnitch-ui] Avvio interfaccia grafica su socket unix://${SOCKET_PATH} ..."
+
+exec /usr/bin/python3 /usr/local/bin/opensnitch-launcher.py --socket "unix://${SOCKET_PATH}"

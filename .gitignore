@@ -1,0 +1,12 @@
+# Configurazione locale e segreti
+.env
+.agent-box.env
+
+# Directory e file generati a runtime da agent-box.sh
+.runtime/
+agent-home/
+ollama-data/
+opensnitch/
+workspace/
+certs/
+hosts
