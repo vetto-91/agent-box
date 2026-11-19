@@ -6,7 +6,7 @@ ARG PGID=1000
 LABEL agentbox.uid="${PUID}" \
       agentbox.gid="${PGID}" \
       agentbox.base="ubuntu26.04" \
-      agentbox.version="3"
+      agentbox.version="4"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libegl1 \
     dbus-x11 \
     xauth \
+    xserver-xephyr \
     pulseaudio-utils \
     alsa-utils \
     fonts-dejavu-core \

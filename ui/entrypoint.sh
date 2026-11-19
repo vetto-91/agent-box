@@ -79,6 +79,26 @@ if [ "${AGENT_AUDIO:-1}" = "1" ] && [ -d /run/agent-audio ] && command -v pacat 
     fi
 fi
 
+# Server X11 annidato e isolato (Xephyr :99) per il container agent:
+# impedisce agli agenti di fare screenshot degli schermi host, keylogging o cliccare sui popup OpenSnitch
+if [ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ] && command -v Xephyr >/dev/null 2>&1; then
+    XEPHYR_DISPLAY="${AGENT_XEPHYR_DISPLAY:-:99}"
+    XEPHYR_SCREEN="${AGENT_SCREEN_SIZE:-1600x900}"
+    echo "[opensnitch-ui] Avvio display sandbox isolato Xephyr ${XEPHYR_DISPLAY} (${XEPHYR_SCREEN})..."
+    rm -f "/tmp/.X11-unix/X${XEPHYR_DISPLAY#:}" "/tmp/.X${XEPHYR_DISPLAY#:}-lock" 2>/dev/null || true
+    (
+        while true; do
+            Xephyr "${XEPHYR_DISPLAY}" \
+                -screen "${XEPHYR_SCREEN}" \
+                -resizeable \
+                -ac \
+                -nolisten tcp \
+                -title "Agent-Box Sandbox Display (${XEPHYR_DISPLAY})" \
+                2>/dev/null || sleep 2
+        done
+    ) &
+fi
+
 echo "[opensnitch-ui] Avvio interfaccia grafica su socket unix://${SOCKET_PATH} ..."
 
 exec /usr/bin/python3 /usr/local/bin/opensnitch-launcher.py --socket "unix://${SOCKET_PATH}"

@@ -173,12 +173,13 @@ RUN set -eux; \
         pulseaudio \
         pulseaudio-utils \
         alsa-utils \
-        libasound2-plugins; \
+        libasound2-plugins \
+        openbox; \
     setcap -r /usr/bin/pulseaudio 2>/dev/null || true; \
     printf 'pcm.!default {\n    type pulse\n    fallback "sysdefault"\n}\nctl.!default {\n    type pulse\n    fallback "sysdefault"\n}\n' > /etc/asound.conf; \
     rm -rf /var/lib/apt/lists/*
 
-LABEL agentbox.gui="3"
+LABEL agentbox.gui="4"
 
 # 5. Crea utente non-root "agent" con UID/GID corrispondenti all'utente host
 RUN (userdel -r ubuntu 2>/dev/null || true) && \

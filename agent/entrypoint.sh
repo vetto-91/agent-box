@@ -159,4 +159,17 @@ if [ "${AGENT_AUDIO:-1}" = "1" ] && command -v pulseaudio >/dev/null 2>&1; then
     fi
 fi
 
+# 6. Avvio window manager leggero (openbox) dentro il display isolato Xephyr (:99)
+if [ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ] && [ -n "${DISPLAY:-}" ] && command -v openbox >/dev/null 2>&1; then
+    (
+        for _ in $(seq 1 30); do
+            [ -S "/tmp/.X11-unix/X${DISPLAY#:}" ] && break
+            sleep 0.5
+        done
+        if [ -S "/tmp/.X11-unix/X${DISPLAY#:}" ]; then
+            exec openbox >/dev/null 2>&1
+        fi
+    ) &
+fi
+
 exec "$@"

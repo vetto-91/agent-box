@@ -129,7 +129,8 @@ Ordine di priorità: **Opzioni CLI > `<cartella_progetto>/.agent-box.env` > vari
 | `AGENT_CPUS` | *(tutti)* | Core CPU per `agent`: vuoto, `0` o `all` usa tutti i core dell'host (`nproc`), altrimenti il numero specificato (limitato a `nproc`). |
 | `AGENT_SHM_SIZE` | `512m` | Dimensione `/dev/shm` per `agent` (utile per applicazioni grafiche, browser ed Electron). |
 | `AGENT_GPU` | `auto` | Accesso GPU/iGPU: `auto` (rileva `/dev/dri`, `/dev/kfd` e runtime NVIDIA), `all`, `igpu`, `nvidia`, `none`. |
-| `AGENT_DISPLAY_MODE` | `auto` | Finestre grafiche per agenti AI e app del progetto: `auto` (Wayland + XWayland/X11), `wayland`, `xwayland`, `x11`, `none`. |
+| `AGENT_DISPLAY_MODE` | `auto` | Finestre grafiche **isolate** per agenti AI e app del progetto: `auto` usa **Wayland-only** su host Wayland (senza socket X11) oppure un server X11 annidato **Xephyr (`:99`)** su host X11, così gli screenshot dall'agente vedono **solo** le finestre del container e mai gli schermi dell'host. Valori: `auto`, `isolated`/`xephyr`, `wayland`, `x11-unsafe` (sconsigliato), `none`. |
+| `AGENT_SCREEN_SIZE` | `1600x900` | Risoluzione iniziale della finestra sandbox isolata `Xephyr` (`:99`, ridimensionabile). |
 | `AGENT_AUDIO` | `1` | `1` abilita l'uscita audio (altoparlanti/cuffie) tramite PulseAudio e ALSA; `0` disabilita tutto l'audio. |
 | `AGENT_MIC` | `0` | **Microfono disabilitato di default (`0`)**: il socket PulseAudio/PipeWire dell'host e i device di cattura ALSA (`/dev/snd/pcmC*D*c`) non vengono montati in `agent` (l'audio in uscita passa da un canale FIFO PCM unidirezionale). Imposta a `1` (o `--mic`) per abilitare il microfono. |
 | `OPENSNITCH_SHOW_MAIN_WINDOW` | `1` | `1` apre automaticamente la finestra principale di OpenSnitch all'avvio; `0` avvia OpenSnitch ridotto nella system tray. |

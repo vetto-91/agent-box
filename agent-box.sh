@@ -193,8 +193,10 @@ detect_user_and_display() {
         "${SCRIPT_DIR}/opensnitch/ui-config" \
         "${SCRIPT_DIR}/opensnitch/socket" \
         "${RUNTIME_DIR}" \
-        "${RUNTIME_DIR}/audio"
+        "${RUNTIME_DIR}/audio" \
+        "${RUNTIME_DIR}/x11-isolated"
     chmod 0777 "${SCRIPT_DIR}/opensnitch/socket" 2>/dev/null || true
+    chmod 1777 "${RUNTIME_DIR}/x11-isolated" 2>/dev/null || true
 
     # Inizializza ./hosts modificabile se non esiste ancora
     if [ ! -f "${SCRIPT_DIR}/hosts" ]; then
@@ -300,17 +302,18 @@ EOF
 # ==============================================================================
 ensure_images_match_user() {
     local expected_base="ubuntu26.04"
-    local ui_uid ui_base agent_uid agent_base agent_gui fw_base
+    local ui_uid ui_base ui_ver agent_uid agent_base agent_gui fw_base
     ui_uid="$(docker inspect -f '{{index .Config.Labels "agentbox.uid"}}' agent-box-ui:local 2>/dev/null || true)"
     ui_base="$(docker inspect -f '{{index .Config.Labels "agentbox.base"}}' agent-box-ui:local 2>/dev/null || true)"
+    ui_ver="$(docker inspect -f '{{index .Config.Labels "agentbox.version"}}' agent-box-ui:local 2>/dev/null || true)"
     agent_uid="$(docker inspect -f '{{index .Config.Labels "agentbox.uid"}}' agent-box-agent:local 2>/dev/null || true)"
     agent_base="$(docker inspect -f '{{index .Config.Labels "agentbox.base"}}' agent-box-agent:local 2>/dev/null || true)"
     agent_gui="$(docker inspect -f '{{index .Config.Labels "agentbox.gui"}}' agent-box-agent:local 2>/dev/null || true)"
     fw_base="$(docker inspect -f '{{index .Config.Labels "agentbox.base"}}' agent-box-firewall:local 2>/dev/null || true)"
 
-    if [ "${ui_uid}" != "${PUID}" ] || [ "${ui_base}" != "${expected_base}" ] || \
+    if [ "${ui_uid}" != "${PUID}" ] || [ "${ui_base}" != "${expected_base}" ] || [ "${ui_ver}" != "4" ] || \
        [ "${agent_uid}" != "${PUID}" ] || [ "${agent_base}" != "${expected_base}" ] || \
-       [ "${agent_gui}" != "3" ] || [ "${fw_base}" != "${expected_base}" ]; then
+       [ "${agent_gui}" != "4" ] || [ "${fw_base}" != "${expected_base}" ]; then
         echo "[agent-box] Build automatico immagini Ubuntu 26.04 per ${HOST_USER} (UID=${PUID}, GID=${PGID})..."
         docker compose -f "${SCRIPT_DIR}/docker-compose.yml" build \
             --build-arg PUID="${PUID}" \
@@ -360,15 +363,19 @@ generate_runtime_override() {
         has_x11=1
     fi
 
-    # Risolvi modalità display effettiva
+    # Risolvi modalità display effettiva (sicura di default: Wayland-only oppure Xephyr :99 isolato)
     local use_wayland=0
-    local use_x11=0
+    local use_xephyr=0
+    local use_x11_unsafe=0
     local sess_type="x11"
     local qt_plat="xcb"
     local gdk_back="x11"
     local electron_hint="x11"
     local moz_wayland="0"
     local sdl_driver="x11"
+    local host_disp_num="${DISPLAY#:}"
+    host_disp_num="${host_disp_num%%.*}"
+    host_disp_num="${host_disp_num:-0}"
 
     case "${display_mode}" in
         none|0|off|false)
@@ -386,25 +393,30 @@ generate_runtime_override() {
                 echo "[agent-box] ATTENZIONE: --display wayland richiesto ma socket Wayland non trovato in ${XDG_RUNTIME_DIR}."
             fi
             ;;
-        xwayland|x11)
+        isolated|xephyr|x11|xwayland)
+            use_xephyr=1
+            ;;
+        x11-unsafe|xwayland-unsafe)
             if [ "${has_x11}" -eq 1 ]; then
-                use_x11=1
+                echo "[agent-box] ATTENZIONE SICUREZZA: modalità '${display_mode}' attiva! L'agente può vedere gli schermi X11 dell'host." >&2
+                use_x11_unsafe=1
             else
                 echo "[agent-box] ATTENZIONE: --display ${display_mode} richiesto ma /tmp/.X11-unix non trovato."
             fi
             ;;
         auto|*)
             if [ "${has_wayland}" -eq 1 ]; then
+                # Su Wayland esponiamo SOLO Wayland (mai /tmp/.X11-unix dell'host) per impedire screenshot degli schermi host
                 use_wayland=1
                 sess_type="wayland"
-                qt_plat="wayland;xcb"
-                gdk_back="wayland,x11"
-                electron_hint="auto"
+                qt_plat="wayland"
+                gdk_back="wayland"
+                electron_hint="wayland"
                 moz_wayland="1"
                 sdl_driver="wayland"
-            fi
-            if [ "${has_x11}" -eq 1 ]; then
-                use_x11=1
+            elif [ "${has_x11}" -eq 1 ]; then
+                # Su X11 isoliamo l'agente in un server Xephyr dedicato (:99): gli screenshot vedono solo le finestre del container
+                use_xephyr=1
             fi
             ;;
     esac
@@ -489,6 +501,20 @@ generate_runtime_override() {
     # Scrivi il file YAML override
     {
         echo "services:"
+
+        if [ "${use_xephyr}" -eq 1 ]; then
+            echo "  opensnitch-ui:"
+            echo "    environment:"
+            echo "      - \"AGENT_XEPHYR_ENABLED=1\""
+            echo "      - \"AGENT_XEPHYR_DISPLAY=:99\""
+            echo "      - \"AGENT_SCREEN_SIZE=${AGENT_SCREEN_SIZE:-1600x900}\""
+            echo "    volumes:"
+            echo "      - \"${RUNTIME_DIR}/x11-isolated:/tmp/.X11-unix:rw\""
+            if [ -S "/tmp/.X11-unix/X${host_disp_num}" ]; then
+                echo "      - \"/tmp/.X11-unix/X${host_disp_num}:/tmp/.X11-unix/X${host_disp_num}:ro\""
+            fi
+        fi
+
         echo "  agent:"
         echo "    shm_size: \"${shm_size}\""
         echo "    tmpfs:"
@@ -519,7 +545,9 @@ generate_runtime_override() {
             fi
         done
 
-        if [ "${use_x11}" -eq 1 ]; then
+        if [ "${use_xephyr}" -eq 1 ]; then
+            vol_lines+=("${RUNTIME_DIR}/x11-isolated:/tmp/.X11-unix:ro")
+        elif [ "${use_x11_unsafe}" -eq 1 ]; then
             vol_lines+=("/tmp/.X11-unix:/tmp/.X11-unix:ro")
             vol_lines+=("${RUNTIME_DIR}/.Xauthority:/tmp/.Xauthority-host:ro")
         fi
@@ -564,10 +592,11 @@ EOF
         local env_lines=()
         env_lines+=("AGENT_AUDIO=${enable_audio}")
         env_lines+=("AGENT_MIC=${enable_mic}")
+        env_lines+=("AGENT_XEPHYR_ENABLED=${use_xephyr}")
         if [ "${enable_audio}" -eq 1 ]; then
             env_lines+=("PULSE_SERVER=unix:/run/user/${PUID}/pulse/native")
         fi
-        if [ "${use_x11}" -eq 1 ] || [ "${use_wayland}" -eq 1 ]; then
+        if [ "${use_xephyr}" -eq 1 ] || [ "${use_x11_unsafe}" -eq 1 ] || [ "${use_wayland}" -eq 1 ]; then
             env_lines+=("XDG_RUNTIME_DIR=/run/user/${PUID}")
             env_lines+=("XDG_SESSION_TYPE=${sess_type}")
             env_lines+=("QT_QPA_PLATFORM=${qt_plat}")
@@ -576,7 +605,9 @@ EOF
             env_lines+=("ELECTRON_OZONE_PLATFORM_HINT=${electron_hint}")
             env_lines+=("MOZ_ENABLE_WAYLAND=${moz_wayland}")
             env_lines+=("SDL_VIDEODRIVER=${sdl_driver}")
-            if [ "${use_x11}" -eq 1 ]; then
+            if [ "${use_xephyr}" -eq 1 ]; then
+                env_lines+=("DISPLAY=:99")
+            elif [ "${use_x11_unsafe}" -eq 1 ]; then
                 env_lines+=("DISPLAY=${DISPLAY}")
                 env_lines+=("XAUTHORITY=/tmp/.Xauthority-host")
             fi
@@ -598,7 +629,7 @@ EOF
     } > "${RUNTIME_OVERRIDE_FILE}"
 
     export AGENT_GPU_SUMMARY="iGPU=${enable_igpu}, NVIDIA=${enable_nvidia}"
-    export AGENT_GUI_SUMMARY="mode=${display_mode} (Wayland=${use_wayland}, X11/XWayland=${use_x11})"
+    export AGENT_GUI_SUMMARY="mode=${display_mode} (Wayland=${use_wayland}, Xephyr-Isolato=${use_xephyr}, X11-Diretto=${use_x11_unsafe})"
     export AGENT_AUDIO_SUMMARY="Audio=${enable_audio}, Microfono=${enable_mic}"
     export AGENT_AUDIO="${enable_audio}"
     export AGENT_MIC="${enable_mic}"
@@ -665,6 +696,13 @@ start_stack() {
     [ -n "${proj_display}" ] && display_mode="${proj_display}"
     [ -n "${CLI_DISPLAY_MODE}" ] && display_mode="${CLI_DISPLAY_MODE}"
     display_mode="${display_mode:-auto}"
+
+    local screen_size="${AGENT_SCREEN_SIZE:-}"
+    [ -z "${screen_size}" ] && screen_size="$(read_env_var "${SCRIPT_DIR}/.env" "AGENT_SCREEN_SIZE")"
+    local proj_screen
+    proj_screen="$(read_env_var "${project_env}" "AGENT_SCREEN_SIZE")"
+    [ -n "${proj_screen}" ] && screen_size="${proj_screen}"
+    export AGENT_SCREEN_SIZE="${screen_size:-1600x900}"
 
     local audio_mode="${AGENT_AUDIO:-}"
     [ -z "${audio_mode}" ] && audio_mode="$(read_env_var "${SCRIPT_DIR}/.env" "AGENT_AUDIO")"
