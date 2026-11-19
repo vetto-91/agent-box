@@ -12,6 +12,8 @@ CLI_EXTRA_VOLUMES=()
 CLI_CPUS=""
 CLI_GPU=""
 CLI_DISPLAY_MODE=""
+CLI_SCREEN_SIZE=""
+CLI_FULLSCREEN=""
 CLI_AUDIO=""
 CLI_MIC=""
 CLI_FW_PROFILE=""
@@ -34,8 +36,10 @@ Opzioni:
   -v, --volume HOST:CONTAINER[:ro|rw]   Monta un volume extra del progetto sul disco (ripetibile)
   --cpus <N|all>                        Numero di core CPU per l'agente (default: tutti)
   --gpu <auto|all|igpu|nvidia|none>     Accesso iGPU/GPU (default: auto)
-  --display <auto|wayland|xwayland|x11|none>
-                                        Modalità finestra grafica per agenti e app (default: auto)
+  --display <auto|isolated|wayland|x11-unsafe|none>
+                                        Modalità display grafico (default: auto -> Xephyr :99 isolato)
+  --screen <WxH>                        Risoluzione monitor virtuale Xephyr (es. 1920x1080, default: 1600x900)
+  --fullscreen                          Avvia il monitor virtuale Xephyr a schermo intero
   --no-gui                              Equivale a --display none
   --audio <on|off|1|0>                  Abilita/disabilita uscita audio (default: on)
   --no-audio                            Disabilita completamente audio e microfono
@@ -291,6 +295,15 @@ EOF
         chmod 0644 "${SCRIPT_DIR}/opensnitch/socket/.Xauthority" "${RUNTIME_DIR}/.Xauthority" 2>/dev/null || true
     fi
 
+    # Copia il cookie PulseAudio dell'host (se presente) in .runtime/pulse-cookie SOLO per opensnitch-ui
+    if [ -r "${HOST_HOME}/.config/pulse/cookie" ]; then
+        cp -f "${HOST_HOME}/.config/pulse/cookie" "${RUNTIME_DIR}/pulse-cookie" 2>/dev/null || true
+        chmod 0644 "${RUNTIME_DIR}/pulse-cookie" 2>/dev/null || true
+    else
+        touch "${RUNTIME_DIR}/pulse-cookie"
+        chmod 0644 "${RUNTIME_DIR}/pulse-cookie" 2>/dev/null || true
+    fi
+
     # Autorizza l'utente locale su XWayland/X11 se xhost è installato
     if command -v xhost >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then
         xhost "+SI:localuser:${HOST_USER}" >/dev/null 2>&1 || true
@@ -313,7 +326,7 @@ ensure_images_match_user() {
 
     if [ "${ui_uid}" != "${PUID}" ] || [ "${ui_base}" != "${expected_base}" ] || [ "${ui_ver}" != "4" ] || \
        [ "${agent_uid}" != "${PUID}" ] || [ "${agent_base}" != "${expected_base}" ] || \
-       [ "${agent_gui}" != "4" ] || [ "${fw_base}" != "${expected_base}" ]; then
+       [ "${agent_gui}" != "5" ] || [ "${fw_base}" != "${expected_base}" ]; then
         echo "[agent-box] Build automatico immagini Ubuntu 26.04 per ${HOST_USER} (UID=${PUID}, GID=${PGID})..."
         docker compose -f "${SCRIPT_DIR}/docker-compose.yml" build \
             --build-arg PUID="${PUID}" \
@@ -405,8 +418,11 @@ generate_runtime_override() {
             fi
             ;;
         auto|*)
-            if [ "${has_wayland}" -eq 1 ]; then
-                # Su Wayland esponiamo SOLO Wayland (mai /tmp/.X11-unix dell'host) per impedire screenshot degli schermi host
+            if [ "${has_x11}" -eq 1 ]; then
+                # Sia su X11 che su Wayland/XWayland usiamo il monitor virtuale isolato Xephyr (:99):
+                # blocca screenshot/keylog dell'host e consente xdotool/xrandr dentro il monitor virtuale
+                use_xephyr=1
+            elif [ "${has_wayland}" -eq 1 ]; then
                 use_wayland=1
                 sess_type="wayland"
                 qt_plat="wayland"
@@ -414,9 +430,6 @@ generate_runtime_override() {
                 electron_hint="wayland"
                 moz_wayland="1"
                 sdl_driver="wayland"
-            elif [ "${has_x11}" -eq 1 ]; then
-                # Su X11 isoliamo l'agente in un server Xephyr dedicato (:99): gli screenshot vedono solo le finestre del container
-                use_xephyr=1
             fi
             ;;
     esac
@@ -508,6 +521,7 @@ generate_runtime_override() {
             echo "      - \"AGENT_XEPHYR_ENABLED=1\""
             echo "      - \"AGENT_XEPHYR_DISPLAY=:99\""
             echo "      - \"AGENT_SCREEN_SIZE=${AGENT_SCREEN_SIZE:-1600x900}\""
+            echo "      - \"AGENT_FULLSCREEN=${AGENT_FULLSCREEN:-0}\""
             echo "    volumes:"
             echo "      - \"${RUNTIME_DIR}/x11-isolated:/tmp/.X11-unix:rw\""
             if [ -S "/tmp/.X11-unix/X${host_disp_num}" ]; then
@@ -702,7 +716,16 @@ start_stack() {
     local proj_screen
     proj_screen="$(read_env_var "${project_env}" "AGENT_SCREEN_SIZE")"
     [ -n "${proj_screen}" ] && screen_size="${proj_screen}"
+    [ -n "${CLI_SCREEN_SIZE}" ] && screen_size="${CLI_SCREEN_SIZE}"
     export AGENT_SCREEN_SIZE="${screen_size:-1600x900}"
+
+    local fullscreen_mode="${AGENT_FULLSCREEN:-}"
+    [ -z "${fullscreen_mode}" ] && fullscreen_mode="$(read_env_var "${SCRIPT_DIR}/.env" "AGENT_FULLSCREEN")"
+    local proj_fs
+    proj_fs="$(read_env_var "${project_env}" "AGENT_FULLSCREEN")"
+    [ -n "${proj_fs}" ] && fullscreen_mode="${proj_fs}"
+    [ -n "${CLI_FULLSCREEN}" ] && fullscreen_mode="${CLI_FULLSCREEN}"
+    export AGENT_FULLSCREEN="${fullscreen_mode:-0}"
 
     local audio_mode="${AGENT_AUDIO:-}"
     [ -z "${audio_mode}" ] && audio_mode="$(read_env_var "${SCRIPT_DIR}/.env" "AGENT_AUDIO")"
@@ -915,6 +938,22 @@ while [ $# -gt 0 ]; do
             ;;
         --display=*)
             CLI_DISPLAY_MODE="${1#*=}"
+            shift
+            ;;
+        --screen)
+            if [ $# -lt 2 ]; then
+                echo "[agent-box] ERRORE: --screen richiede una risoluzione (es. 1920x1080)." >&2
+                exit 1
+            fi
+            CLI_SCREEN_SIZE="$2"
+            shift 2
+            ;;
+        --screen=*)
+            CLI_SCREEN_SIZE="${1#*=}"
+            shift
+            ;;
+        --fullscreen)
+            CLI_FULLSCREEN="1"
             shift
             ;;
         --no-gui)

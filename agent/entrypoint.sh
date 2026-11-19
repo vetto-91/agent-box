@@ -159,16 +159,80 @@ if [ "${AGENT_AUDIO:-1}" = "1" ] && command -v pulseaudio >/dev/null 2>&1; then
     fi
 fi
 
-# 6. Avvio window manager leggero (openbox) dentro il display isolato Xephyr (:99)
+# 6. Avvio window manager (openbox) in loop persistente dentro il monitor virtuale isolato Xephyr (:99)
+#    Così tutte le finestre dentro Xephyr sono ridimensionabili, spostabili, massimizzabili (Alt+F10 / F11)
+#    e si adattano dinamicamente quando la finestra Xephyr cambia risoluzione (come un monitor virtuale)
 if [ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ] && [ -n "${DISPLAY:-}" ] && command -v openbox >/dev/null 2>&1; then
+    cat <<'EOF' > /tmp/openbox-rc.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <resistance>
+    <strength>10</strength>
+    <screen_edge_strength>20</screen_edge_strength>
+  </resistance>
+  <focus>
+    <focusNew>yes</focusNew>
+    <followMouse>no</followMouse>
+  </focus>
+  <placement>
+    <policy>Smart</policy>
+    <center>yes</center>
+  </placement>
+  <theme>
+    <name>Clearlooks</name>
+    <titleLayout>NLIMC</titleLayout>
+    <keepBorder>yes</keepBorder>
+  </theme>
+  <desktops>
+    <number>1</number>
+  </desktops>
+  <resize>
+    <drawContents>yes</drawContents>
+  </resize>
+  <keyboard>
+    <keybind key="A-Tab"><action name="NextWindow"/></keybind>
+    <keybind key="A-F4"><action name="Close"/></keybind>
+    <keybind key="A-F10"><action name="ToggleMaximize"/></keybind>
+    <keybind key="F11"><action name="ToggleFullscreen"/></keybind>
+  </keyboard>
+  <mouse>
+    <context name="Frame">
+      <mousebind button="A-Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
+      <mousebind button="A-Left" action="Drag"><action name="Move"/></mousebind>
+      <mousebind button="A-Right" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
+      <mousebind button="A-Right" action="Drag"><action name="Resize"/></mousebind>
+    </context>
+    <context name="Titlebar">
+      <mousebind button="Left" action="Drag"><action name="Move"/></mousebind>
+      <mousebind button="Left" action="DoubleClick"><action name="ToggleMaximize"/></mousebind>
+    </context>
+    <context name="Top"><mousebind button="Left" action="Drag"><action name="Resize"><edge>top</edge></action></mousebind></context>
+    <context name="Left"><mousebind button="Left" action="Drag"><action name="Resize"><edge>left</edge></action></mousebind></context>
+    <context name="Right"><mousebind button="Left" action="Drag"><action name="Resize"><edge>right</edge></action></mousebind></context>
+    <context name="Bottom"><mousebind button="Left" action="Drag"><action name="Resize"><edge>bottom</edge></action></mousebind></context>
+    <context name="TRCorner"><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="TLCorner"><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="BRCorner"><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="BLCorner"><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="Maximize"><mousebind button="Left" action="Click"><action name="ToggleMaximize"/></mousebind></context>
+    <context name="Iconify"><mousebind button="Left" action="Click"><action name="Iconify"/></mousebind></context>
+    <context name="Close"><mousebind button="Left" action="Click"><action name="Close"/></mousebind></context>
+  </mouse>
+  <applications>
+    <application class="*">
+      <decor>yes</decor>
+    </application>
+  </applications>
+</openbox_config>
+EOF
     (
-        for _ in $(seq 1 30); do
-            [ -S "/tmp/.X11-unix/X${DISPLAY#:}" ] && break
-            sleep 0.5
+        while true; do
+            if [ -S "/tmp/.X11-unix/X${DISPLAY#:}" ] && xdpyinfo -display "${DISPLAY}" >/dev/null 2>&1; then
+                xsetroot -display "${DISPLAY}" -solid "#1e1e2e" 2>/dev/null || true
+                openbox --config-file /tmp/openbox-rc.xml >/dev/null 2>&1 || true
+            fi
+            sleep 1
         done
-        if [ -S "/tmp/.X11-unix/X${DISPLAY#:}" ]; then
-            exec openbox >/dev/null 2>&1
-        fi
     ) &
 fi
 

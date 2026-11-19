@@ -49,6 +49,7 @@ services:
       - ./opensnitch/ui-config:/home/snitch/.config/opensnitch:rw
       - ./opensnitch-profiles:/home/snitch/opensnitch-profiles:ro
       - ./.runtime/audio:/run/agent-audio:rw
+      - ./.runtime/pulse-cookie:/tmp/.pulse-cookie:ro
       - ./ui/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
       - ./ui/opensnitch-launcher.py:/usr/local/bin/opensnitch-launcher.py:ro
       - /tmp/.X11-unix:/tmp/.X11-unix:ro

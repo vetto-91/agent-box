@@ -71,7 +71,9 @@ Sintassi generale:
 | `-v`, `--volume HOST:CONTAINER[:ro\|rw]` | Monta un volume extra del progetto sul disco dentro `agent` (ripetibile più volte). |
 | `--cpus <N\|all>` | Numero di core CPU da assegnare ad `agent` (default: `all`, tutti i core dell'host). |
 | `--gpu <auto\|all\|igpu\|nvidia\|none>` | Configura l'accesso a iGPU (`/dev/dri`, `/dev/kfd`) e GPU NVIDIA (default: `auto`). |
-| `--display <auto\|wayland\|xwayland\|x11\|none>` | Abilita le finestre grafiche X11, XWayland e Wayland per gli agenti AI e le applicazioni del progetto (default: `auto`). |
+| `--display <auto\|isolated\|wayland\|x11-unsafe\|none>` | Modalità display grafico (default: `auto` → monitor virtuale isolato `Xephyr :99` con `openbox` e `xdotool` sia su X11 che su Wayland/XWayland). |
+| `--screen <WxH>` | Risoluzione iniziale del monitor virtuale `Xephyr` (es. `1920x1080`, default `1600x900`). |
+| `--fullscreen` | Avvia il monitor virtuale `Xephyr` a schermo intero (simula un desktop/monitor dedicato). |
 | `--no-gui` | Equivale a `--display none`. |
 | `--audio <on\|off\|1\|0>` / `--no-audio` | Abilita o disabilita l'uscita audio (default: `on`). |
 | `--mic [on\|off\|1\|0]` / `--no-mic` | Abilita o disabilita il microfono nel container (default: **disabilitato**, `0`). |
