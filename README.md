@@ -77,11 +77,12 @@ Quando esci da un agente specifico (`claude`, `codex`, `opencode`, ecc.), **rima
 ./agent-box.sh pi-desktop /percorso/mio-progetto        # Pi Agent in finestra grafica dedicata (alias: pi-gui)
 ./agent-box.sh hermes-desktop /percorso/mio-progetto    # Hermes Agent in finestra grafica dedicata (alias: hermes-gui)
 
-# Opzioni avanzate (volumi extra sul disco, core CPU, iGPU/GPU, display X11/Wayland):
-./agent-box.sh -v /percorso/dati:/dati:ro --cpus 4 --gpu auto --display auto claude /percorso/mio-progetto
+# Opzioni avanzate (volumi extra sul disco, core CPU, iGPU/GPU, display X11/Wayland, profilo firewall OpenSnitch):
+./agent-box.sh -v /percorso/dati:/dati:ro --cpus 4 --gpu auto --display auto --fw-profile solo-provider-ia claude /percorso/mio-progetto
 
-# Oppure esegui qualsiasi altro comando nella sandbox:
-./agent-box.sh exec /percorso/mio-progetto <comando>
+# Cambiare o elencare i profili di regole OpenSnitch (importabili anche da GUI in /home/snitch/opensnitch-profiles):
+./agent-box.sh fw-profile list
+./agent-box.sh fw-profile solo-lan
 ```
 
 ### 3. Modelli locali e HTTPS con certificato self-signed
@@ -114,3 +115,4 @@ Quando esci da un agente specifico (`claude`, `codex`, `opencode`, ecc.), **rima
 | `AGENT_GPU` | `auto` | Accesso iGPU (`/dev/dri`, `/dev/kfd`) e GPU NVIDIA (`auto`, `all`, `igpu`, `nvidia`, `none`). |
 | `AGENT_DISPLAY_MODE` | `auto` | Finestre grafiche Wayland / XWayland / X11 per agenti e app del progetto (`auto`, `wayland`, `xwayland`, `x11`, `none`). |
 | `OPENSNITCH_SHOW_MAIN_WINDOW` | `1` | Apre di default la finestra principale di OpenSnitch all'avvio (`0` per lasciarla solo nella system tray). |
+| `OPENSNITCH_PROFILE` | *(vuoto)* | Profilo regole OpenSnitch da applicare all'avvio (`interattivo`, `disabilitato`, `solo-lan`, `solo-lan-ia`, `solo-internet`, `solo-provider-ia`, `solo-443-ipv4`). |

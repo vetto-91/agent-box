@@ -1,0 +1,17 @@
+{
+  "created": "2026-01-01T00:00:00.000000Z",
+  "updated": "2026-01-01T00:00:00.000000Z",
+  "name": "101-deny-lan-172-16-0-0",
+  "description": "Blocca rete locale RFC1918 / Docker 172.16.0.0/12",
+  "enabled": true,
+  "precedence": true,
+  "nolog": false,
+  "action": "deny",
+  "duration": "always",
+  "operator": {
+    "type": "network",
+    "operand": "dest.network",
+    "data": "172.16.0.0/12",
+    "sensitive": false
+  }
+}

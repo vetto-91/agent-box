@@ -1,0 +1,17 @@
+{
+  "created": "2026-01-01T00:00:00.000000Z",
+  "updated": "2026-01-01T00:00:00.000000Z",
+  "name": "100-allow-lan-10-0-0-0",
+  "description": "Consenti rete locale RFC1918 10.0.0.0/8",
+  "enabled": true,
+  "precedence": true,
+  "nolog": false,
+  "action": "allow",
+  "duration": "always",
+  "operator": {
+    "type": "network",
+    "operand": "dest.network",
+    "data": "10.0.0.0/8",
+    "sensitive": false
+  }
+}

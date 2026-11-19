@@ -43,6 +43,7 @@ services:
     volumes:
       - ./opensnitch/socket:/run/opensnitch:rw
       - ./opensnitch/ui-config:/home/snitch/.config/opensnitch:rw
+      - ./opensnitch-profiles:/home/snitch/opensnitch-profiles:ro
       - ./ui/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
       - ./ui/opensnitch-launcher.py:/usr/local/bin/opensnitch-launcher.py:ro
       - /tmp/.X11-unix:/tmp/.X11-unix:ro

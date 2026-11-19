@@ -12,13 +12,14 @@ CLI_EXTRA_VOLUMES=()
 CLI_CPUS=""
 CLI_GPU=""
 CLI_DISPLAY_MODE=""
+CLI_FW_PROFILE=""
 
 print_usage() {
     cat <<EOF
 Utilizzo: $0 [OPZIONI] <COMANDO> [cartella_progetto] [argomenti...]
 
 Comandi CLI:
-  build, shell, exec, test-popup, test-isolation, logs, stop
+  build, shell, exec, fw-profile, test-popup, test-isolation, logs, stop
   claude, chatgpt (codex), grok, agy, pi, gemini, opencode, aider, hermes
 
 Comandi GUI / Desktop:
@@ -34,8 +35,60 @@ Opzioni:
   --display <auto|wayland|xwayland|x11|none>
                                         Modalità finestra grafica per agenti e app (default: auto)
   --no-gui                              Equivale a --display none
+  --fw-profile <profilo>                Importa/attiva un profilo regole OpenSnitch da ./opensnitch-profiles:
+                                          interattivo | disabilitato | solo-lan | solo-lan-ia |
+                                          solo-internet | solo-provider-ia | solo-443-ipv4
   -h, --help                            Mostra questo messaggio
 EOF
+}
+
+resolve_opensnitch_profile() {
+    local req="$1"
+    case "${req}" in
+        0|interattivo|interactive|default|0-interattivo-default)
+            printf '0-interattivo-default'
+            ;;
+        1|disabilitato|disabled|allow-all|1-disabilitato-allow-all)
+            printf '1-disabilitato-allow-all'
+            ;;
+        2|solo-lan|lan|lan-only|2-solo-lan)
+            printf '2-solo-lan'
+            ;;
+        3|solo-lan-ia|lan-ia|lan-ai|solo-lan-con-provider-ia|3-solo-lan-con-provider-ia)
+            printf '3-solo-lan-con-provider-ia'
+            ;;
+        4|solo-internet|internet-no-lan|no-lan|4-solo-internet-no-lan)
+            printf '4-solo-internet-no-lan'
+            ;;
+        5|solo-ia|solo-provider-ia|ai-only|ia|5-solo-provider-ia)
+            printf '5-solo-provider-ia'
+            ;;
+        6|solo-443-ipv4|443-ipv4|443|only-443-ipv4|6-solo-443-ipv4)
+            printf '6-solo-443-ipv4'
+            ;;
+        *)
+            if [ -d "${SCRIPT_DIR}/opensnitch-profiles/${req}" ]; then
+                printf '%s' "${req}"
+            else
+                return 1
+            fi
+            ;;
+    esac
+}
+
+apply_opensnitch_profile() {
+    local req="$1"
+    local resolved
+    if ! resolved="$(resolve_opensnitch_profile "${req}")"; then
+        echo "[agent-box] ERRORE: profilo OpenSnitch '${req}' non trovato in ${SCRIPT_DIR}/opensnitch-profiles." >&2
+        echo "[agent-box] Profili disponibili:" >&2
+        ls -1 "${SCRIPT_DIR}/opensnitch-profiles" >&2
+        exit 1
+    fi
+    mkdir -p "${SCRIPT_DIR}/opensnitch/rules"
+    rm -f "${SCRIPT_DIR}/opensnitch/rules/"*.json
+    cp -f "${SCRIPT_DIR}/opensnitch-profiles/${resolved}/"*.json "${SCRIPT_DIR}/opensnitch/rules/"
+    echo "[agent-box] Profilo OpenSnitch attivato: ${resolved} ($(ls -1 "${SCRIPT_DIR}/opensnitch/rules/"*.json 2>/dev/null | wc -l) regole)"
 }
 
 dc() {
@@ -517,6 +570,16 @@ start_stack() {
     [ -n "${proj_snitch}" ] && show_snitch_win="${proj_snitch}"
     export OPENSNITCH_SHOW_MAIN_WINDOW="${show_snitch_win:-1}"
 
+    local fw_profile="${OPENSNITCH_PROFILE:-}"
+    [ -z "${fw_profile}" ] && fw_profile="$(read_env_var "${SCRIPT_DIR}/.env" "OPENSNITCH_PROFILE")"
+    local proj_fw_profile
+    proj_fw_profile="$(read_env_var "${project_env}" "OPENSNITCH_PROFILE")"
+    [ -n "${proj_fw_profile}" ] && fw_profile="${proj_fw_profile}"
+    [ -n "${CLI_FW_PROFILE}" ] && fw_profile="${CLI_FW_PROFILE}"
+    if [ -n "${fw_profile}" ]; then
+        apply_opensnitch_profile "${fw_profile}"
+    fi
+
     # Volumi extra (.env + .agent-box.env + CLI -v)
     local raw_vols=""
     local env_vols proj_vols
@@ -701,6 +764,18 @@ while [ $# -gt 0 ]; do
             CLI_DISPLAY_MODE="none"
             shift
             ;;
+        --fw-profile)
+            if [ $# -lt 2 ]; then
+                echo "[agent-box] ERRORE: --fw-profile richiede un argomento." >&2
+                exit 1
+            fi
+            CLI_FW_PROFILE="$2"
+            shift 2
+            ;;
+        --fw-profile=*)
+            CLI_FW_PROFILE="${1#*=}"
+            shift
+            ;;
         -h|--help)
             print_usage
             exit 0
@@ -779,6 +854,23 @@ case "${CMD}" in
         ;;
     test-isolation|audit)
         run_security_audit
+        ;;
+    fw-profile|rules)
+        if [ -z "${1:-}" ] || [ "${1:-}" = "list" ]; then
+            echo "Profili regole OpenSnitch disponibili in ./opensnitch-profiles (e in /home/snitch/opensnitch-profiles nella GUI):"
+            for pdir in "${SCRIPT_DIR}/opensnitch-profiles"/*; do
+                [ -d "${pdir}" ] && echo "  - $(basename "${pdir}") ($(ls -1 "${pdir}"/*.json 2>/dev/null | wc -l) regole)"
+            done
+            echo ""
+            echo "Regole attualmente presenti in ./opensnitch/rules:"
+            ls -1 "${SCRIPT_DIR}/opensnitch/rules"/*.json 2>/dev/null | xargs -r -n1 basename || echo "  (nessuna)"
+        else
+            apply_opensnitch_profile "$1"
+            if [ "$(docker inspect -f '{{.State.Status}}' agent-box-firewall 2>/dev/null || true)" = "running" ]; then
+                echo "[agent-box] Riavvio container firewall per applicare immediatamente le nuove regole..."
+                dc restart firewall
+            fi
+        fi
         ;;
     stop|down)
         detect_user_and_display

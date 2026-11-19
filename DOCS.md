@@ -73,6 +73,7 @@ Sintassi generale:
 | `--gpu <auto\|all\|igpu\|nvidia\|none>` | Configura l'accesso a iGPU (`/dev/dri`, `/dev/kfd`) e GPU NVIDIA (default: `auto`). |
 | `--display <auto\|wayland\|xwayland\|x11\|none>` | Abilita le finestre grafiche X11, XWayland e Wayland per gli agenti AI e le applicazioni del progetto (default: `auto`). |
 | `--no-gui` | Equivale a `--display none`. |
+| `--fw-profile <profilo>` | Attiva uno dei profili di regole OpenSnitch presenti in `./opensnitch-profiles` (`interattivo`, `disabilitato`, `solo-lan`, `solo-lan-ia`, `solo-internet`, `solo-provider-ia`, `solo-443-ipv4`). |
 
 Se `cartella_progetto` viene omessa (o il primo argomento non è una directory esistente, es. `./agent-box.sh claude --version`), viene montata automaticamente la cartella `./workspace`.
 Quando esci da un agente specifico (`claude`, `codex`, `grok`, `agy`, `pi`, `gemini`, `opencode`, `aider`, `hermes`), **rimani automaticamente nella shell interattiva `bash` del container** in `/workspace` (digita `exit` per uscire dal container).
@@ -102,6 +103,7 @@ Quando esci da un agente specifico (`claude`, `codex`, `grok`, `agy`, `pi`, `gem
 | `exec` | Esegue un comando arbitrario dentro il container `agent` (es. `./agent-box.sh exec /mio/progetto python3 script.py`). |
 | `test-popup` / `popup` | Verifica il socket `osui.sock` ed esegue `curl -I https://example.com` dall'agente per far comparire il popup OpenSnitch. |
 | `test-isolation` / `audit` | Esegue l'audit di sicurezza dentro `agent` (UID non-root, `CapEff=0`, `NoNewPrivs=1`, rootfs `read_only`, socket invisibile, `kill` bloccato). |
+| `fw-profile [profilo\|list]` | Elenca o applica immediatamente un profilo di regole OpenSnitch da `./opensnitch-profiles` (riavviando `firewall` se già attivo). |
 | `logs` | Mostra i log in tempo reale (`docker compose logs -f`). |
 | `stop` / `down` | Arresta e rimuove i container e la rete (`docker compose down`). |
 
@@ -126,6 +128,20 @@ Ordine di priorità: **Opzioni CLI > `<cartella_progetto>/.agent-box.env` > vari
 | `AGENT_GPU` | `auto` | Accesso GPU/iGPU: `auto` (rileva `/dev/dri`, `/dev/kfd` e runtime NVIDIA), `all`, `igpu`, `nvidia`, `none`. |
 | `AGENT_DISPLAY_MODE` | `auto` | Finestre grafiche per agenti AI e app del progetto: `auto` (Wayland + XWayland/X11), `wayland`, `xwayland`, `x11`, `none`. |
 | `OPENSNITCH_SHOW_MAIN_WINDOW` | `1` | `1` apre automaticamente la finestra principale di OpenSnitch all'avvio; `0` avvia OpenSnitch ridotto nella system tray. |
+| `OPENSNITCH_PROFILE` | *(vuoto)* | Profilo regole OpenSnitch preimpostato (`interattivo`, `disabilitato`, `solo-lan`, `solo-lan-ia`, `solo-internet`, `solo-provider-ia`, `solo-443-ipv4`). |
+
+### Profili di Regole OpenSnitch (`./opensnitch-profiles`)
+Tutti i profili sono salvati in `./opensnitch-profiles/<profilo>/*.json` e sono montati anche dentro il container `opensnitch-ui` in `/home/snitch/opensnitch-profiles` (così puoi importarli direttamente dalla finestra principale di OpenSnitch tramite **Azioni -> Importa regole** selezionando la cartella del profilo, oppure da CLI con `./agent-box.sh fw-profile <profilo>`):
+
+| Cartella Profilo | Alias CLI / `.env` | Comportamento |
+| :--- | :--- | :--- |
+| `0-interattivo-default` | `interattivo` | Consente loopback e DNS, chiede conferma tramite popup per ogni altra connessione. |
+| `1-disabilitato-allow-all` | `disabilitato` | Equivalente a firewall disabilitato: consente tutto il traffico senza popup. |
+| `2-solo-lan` | `solo-lan` | Consente solo le reti locali/private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `100.64.0.0/10`) e blocca Internet. |
+| `3-solo-lan-con-provider-ia` | `solo-lan-ia` | Consente le reti LAN private e i domini/API dei provider IA, bloccando tutto il resto di Internet. |
+| `4-solo-internet-no-lan` | `solo-internet` | Blocca tutte le reti LAN private e consente Internet pubblica. |
+| `5-solo-provider-ia` | `solo-provider-ia` | Blocca tutte le reti LAN private e tutto il resto di Internet, consentendo solo i domini/API dei provider IA. |
+| `6-solo-443-ipv4` | `solo-443-ipv4` | Consente esclusivamente traffico sulla porta `443` verso indirizzi IPv4 (più DNS/loopback), bloccando ogni altra porta. |
 
 ### Modelli Locali e TLS Self-Signed
 | Variabile | Default | Descrizione |

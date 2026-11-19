@@ -1,0 +1,31 @@
+{
+  "created": "2026-01-01T00:00:00.000000Z",
+  "updated": "2026-01-01T00:00:00.000000Z",
+  "name": "200-allow-only-443-ipv4",
+  "description": "Consenti esclusivamente traffico sulla porta 443 verso indirizzi IPv4",
+  "enabled": true,
+  "precedence": true,
+  "nolog": false,
+  "action": "allow",
+  "duration": "always",
+  "operator": {
+    "type": "list",
+    "operand": "list",
+    "data": "",
+    "sensitive": false,
+    "list": [
+      {
+        "type": "simple",
+        "operand": "dest.port",
+        "data": "443",
+        "sensitive": false
+      },
+      {
+        "type": "regexp",
+        "operand": "dest.ip",
+        "data": "^([0-9]{1,3}\\.){3}[0-9]{1,3}$",
+        "sensitive": false
+      }
+    ]
+  }
+}

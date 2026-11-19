@@ -1,0 +1,17 @@
+{
+  "created": "2026-01-01T00:00:00.000000Z",
+  "updated": "2026-01-01T00:00:00.000000Z",
+  "name": "001-auto-dns",
+  "description": "Consenti risoluzione DNS (porta 53)",
+  "enabled": true,
+  "precedence": true,
+  "nolog": false,
+  "action": "allow",
+  "duration": "always",
+  "operator": {
+    "type": "simple",
+    "operand": "dest.port",
+    "data": "53",
+    "sensitive": false
+  }
+}

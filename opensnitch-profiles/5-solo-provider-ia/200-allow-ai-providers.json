@@ -1,0 +1,17 @@
+{
+  "created": "2026-01-01T00:00:00.000000Z",
+  "updated": "2026-01-01T00:00:00.000000Z",
+  "name": "200-allow-ai-providers",
+  "description": "Consenti API e domini dei provider IA (Anthropic, OpenAI, xAI, Google/Gemini/AGY, OpenRouter, OpenCode, HF, ecc.)",
+  "enabled": true,
+  "precedence": true,
+  "nolog": false,
+  "action": "allow",
+  "duration": "always",
+  "operator": {
+    "type": "regexp",
+    "operand": "dest.host",
+    "data": "^(.+\\.)?(anthropic\\.com|claude\\.ai|claude\\.com|openai\\.com|chatgpt\\.com|oaistatic\\.com|oaiusercontent\\.com|x\\.ai|grok\\.com|googleapis\\.com|google\\.com|gstatic\\.com|antigravity\\.google|idx\\.google\\.com|run\\.app|openrouter\\.ai|opencode\\.ai|huggingface\\.co|hf\\.co|deepseek\\.com|mistral\\.ai|cohere\\.ai|cohere\\.com|groq\\.com|together\\.xyz|fireworks\\.ai|perplexity\\.ai|replicate\\.com)$",
+    "sensitive": false
+  }
+}
