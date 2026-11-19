@@ -90,6 +90,15 @@ Quando esci da un agente specifico (`claude`, `codex`, `grok`, `agy`, `pi`, `gem
 | `opencode` | Avvia **OpenCode** (`opencode-ai`). |
 | `aider` | Avvia **Aider** (`aider-chat`, installato al primo avvio in `/home/agent/.local` tramite `uv`, oppure al build con `INSTALL_AIDER_AT_BUILD=1`). |
 | `hermes` | Avvia **Hermes Agent** di Nous Research (`hermes-agent`, installato al primo avvio tramite `uv`, oppure al build con `INSTALL_HERMES_AT_BUILD=1`). |
+| `claude-desktop` / `claude-gui` | Avvia **Claude Desktop** ufficiale per Linux (GUI Electron con supporto Claude Code e MCP). |
+| `chatgpt-desktop` / `chatgpt-gui` / `codex-desktop` / `codex-gui` | Avvia **ChatGPT / Codex Desktop App** ufficiale di OpenAI per Linux. |
+| `opencode-desktop` / `opencode-gui` / `opencode-web` | Avvia **OpenCode Desktop** ufficiale per Linux (o l'interfaccia web `opencode web`). |
+| `aider-desktop` / `aider-gui` | Avvia l'interfaccia grafica web di **Aider** (`aider --gui`) in una finestra desktop dedicata. |
+| `grok-desktop` / `grok-gui` | Avvia **Grok** in una finestra desktop App-Mode dedicata (oppure `--terminal` per la finestra grafica CLI). |
+| `gemini-desktop` / `gemini-gui` | Avvia **Gemini** in una finestra desktop App-Mode dedicata (oppure `--terminal` per la finestra grafica CLI). |
+| `agy-desktop` / `agy-gui` / `antigravity-desktop` | Avvia **Antigravity (`agy`)** in una finestra grafica Alacritty dedicata (oppure `--web` per Project IDX). |
+| `pi-desktop` / `pi-gui` | Avvia **Pi Coding Agent** in una finestra grafica Alacritty dedicata. |
+| `hermes-desktop` / `hermes-gui` | Avvia **Hermes Agent** in una finestra grafica Alacritty dedicata. |
 | `exec` | Esegue un comando arbitrario dentro il container `agent` (es. `./agent-box.sh exec /mio/progetto python3 script.py`). |
 | `test-popup` / `popup` | Verifica il socket `osui.sock` ed esegue `curl -I https://example.com` dall'agente per far comparire il popup OpenSnitch. |
 | `test-isolation` / `audit` | Esegue l'audit di sicurezza dentro `agent` (UID non-root, `CapEff=0`, `NoNewPrivs=1`, rootfs `read_only`, socket invisibile, `kill` bloccato). |

@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_NAME="$(basename "$0")"
+if [ "${APP_NAME}" = "agent-gui-launcher" ]; then
+    APP_NAME="${1:-}"
+    shift || true
+fi
+
+# Avvia un bus D-Bus di sessione isolato nel container se non già presente
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && command -v dbus-run-session >/dev/null 2>&1; then
+    exec dbus-run-session -- "$0" "$@"
+fi
+
+OZONE_HINT="${ELECTRON_OZONE_PLATFORM_HINT:-auto}"
+COMMON_ELECTRON_FLAGS=(
+    "--no-sandbox"
+    "--disable-gpu-sandbox"
+    "--ozone-platform-hint=${OZONE_HINT}"
+)
+
+launch_webapp() {
+    local profile_name="$1"
+    local wm_class="$2"
+    local url="$3"
+    shift 3
+    local profile_dir="${HOME}/.config/agent-gui/${profile_name}"
+    mkdir -p "${profile_dir}"
+
+    if command -v google-chrome-stable >/dev/null 2>&1; then
+        exec google-chrome-stable \
+            "${COMMON_ELECTRON_FLAGS[@]}" \
+            --no-first-run \
+            --no-default-browser-check \
+            --user-data-dir="${profile_dir}" \
+            --class="${wm_class}" \
+            --app="${url}" \
+            "$@"
+    elif command -v falkon >/dev/null 2>&1; then
+        exec falkon --no-remote -p "${profile_dir}" "${url}" "$@"
+    else
+        echo "[agent-box] ERRORE: nessun browser GUI (google-chrome-stable / falkon) trovato nel container." >&2
+        exit 1
+    fi
+}
+
+launch_terminal_gui() {
+    local title="$1"
+    local bin="$2"
+    shift 2
+    if command -v alacritty >/dev/null 2>&1; then
+        exec alacritty -T "${title}" --working-directory "$(pwd)" -e "${bin}" "$@"
+    elif command -v xterm >/dev/null 2>&1; then
+        exec xterm -T "${title}" -e "${bin}" "$@"
+    else
+        echo "[agent-box] ATTENZIONE: alacritty/xterm non trovato, avvio ${bin} nel terminale corrente..."
+        exec "${bin}" "$@"
+    fi
+}
+
+case "${APP_NAME}" in
+    claude-desktop|claude-gui)
+        if [ -x /usr/lib/claude-desktop/claude-desktop ]; then
+            exec /usr/lib/claude-desktop/claude-desktop "${COMMON_ELECTRON_FLAGS[@]}" "$@"
+        else
+            launch_webapp "claude" "ClaudeDesktop" "https://claude.ai" "$@"
+        fi
+        ;;
+    chatgpt-desktop|chatgpt-gui|codex-desktop|codex-gui)
+        if [ -x /usr/bin/chatgpt ]; then
+            exec /usr/bin/chatgpt "${COMMON_ELECTRON_FLAGS[@]}" "$@"
+        else
+            launch_webapp "chatgpt" "ChatGPTDesktop" "https://chatgpt.com" "$@"
+        fi
+        ;;
+    opencode-desktop|opencode-gui)
+        if [ -x /opt/OpenCode/ai.opencode.desktop ]; then
+            exec /opt/OpenCode/ai.opencode.desktop "${COMMON_ELECTRON_FLAGS[@]}" "$@"
+        elif [ -x /usr/bin/ai.opencode.desktop ]; then
+            exec /usr/bin/ai.opencode.desktop "${COMMON_ELECTRON_FLAGS[@]}" "$@"
+        else
+            export BROWSER="/usr/local/bin/agent-webapp-open"
+            exec opencode web "$@"
+        fi
+        ;;
+    opencode-web)
+        export BROWSER="/usr/local/bin/agent-webapp-open"
+        exec opencode web "$@"
+        ;;
+    aider-desktop|aider-gui)
+        export BROWSER="/usr/local/bin/agent-webapp-open"
+        exec aider --gui "$@"
+        ;;
+    grok-desktop|grok-gui)
+        if [ "${1:-}" = "--terminal" ]; then
+            shift
+            launch_terminal_gui "xAI Grok CLI" grok "$@"
+        else
+            launch_webapp "grok" "GrokDesktop" "https://grok.com" "$@"
+        fi
+        ;;
+    gemini-desktop|gemini-gui)
+        if [ "${1:-}" = "--terminal" ]; then
+            shift
+            launch_terminal_gui "Google Gemini CLI" gemini "$@"
+        else
+            launch_webapp "gemini" "GeminiDesktop" "https://gemini.google.com" "$@"
+        fi
+        ;;
+    agy-desktop|agy-gui|antigravity-desktop|antigravity-gui)
+        if [ "${1:-}" = "--web" ]; then
+            shift
+            launch_webapp "antigravity" "AntigravityWeb" "https://idx.google.com" "$@"
+        else
+            launch_terminal_gui "Google Antigravity (agy)" agy "$@"
+        fi
+        ;;
+    pi-desktop|pi-gui)
+        launch_terminal_gui "Pi Coding Agent" pi "$@"
+        ;;
+    hermes-desktop|hermes-gui)
+        launch_terminal_gui "Hermes Agent" hermes "$@"
+        ;;
+    agent-webapp-open)
+        launch_webapp "webapp" "AgentBoxWebApp" "${1:-http://127.0.0.1:8501}"
+        ;;
+    *)
+        echo "[agent-box] Applicazione GUI sconosciuta: '${APP_NAME}'" >&2
+        exit 1
+        ;;
+esac

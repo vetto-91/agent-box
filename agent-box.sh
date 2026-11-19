@@ -15,7 +15,17 @@ CLI_DISPLAY_MODE=""
 
 print_usage() {
     cat <<EOF
-Utilizzo: $0 [OPZIONI] {build|shell|claude|chatgpt|codex|grok|agy|pi|gemini|opencode|aider|hermes|exec|test-popup|test-isolation|logs|stop} [cartella_progetto] [argomenti...]
+Utilizzo: $0 [OPZIONI] <COMANDO> [cartella_progetto] [argomenti...]
+
+Comandi CLI:
+  build, shell, exec, test-popup, test-isolation, logs, stop
+  claude, chatgpt (codex), grok, agy, pi, gemini, opencode, aider, hermes
+
+Comandi GUI / Desktop:
+  claude-desktop (claude-gui), chatgpt-desktop (chatgpt-gui / codex-desktop / codex-gui),
+  opencode-desktop (opencode-gui / opencode-web), aider-desktop (aider-gui),
+  grok-desktop (grok-gui), gemini-desktop (gemini-gui),
+  agy-desktop (agy-gui / antigravity-desktop), pi-desktop (pi-gui), hermes-desktop (hermes-gui)
 
 Opzioni:
   -v, --volume HOST:CONTAINER[:ro|rw]   Monta un volume extra del progetto sul disco (ripetibile)
@@ -180,16 +190,17 @@ EOF
 # ==============================================================================
 ensure_images_match_user() {
     local expected_base="ubuntu26.04"
-    local ui_uid ui_base agent_uid agent_base fw_base
+    local ui_uid ui_base agent_uid agent_base agent_gui fw_base
     ui_uid="$(docker inspect -f '{{index .Config.Labels "agentbox.uid"}}' agent-box-ui:local 2>/dev/null || true)"
     ui_base="$(docker inspect -f '{{index .Config.Labels "agentbox.base"}}' agent-box-ui:local 2>/dev/null || true)"
     agent_uid="$(docker inspect -f '{{index .Config.Labels "agentbox.uid"}}' agent-box-agent:local 2>/dev/null || true)"
     agent_base="$(docker inspect -f '{{index .Config.Labels "agentbox.base"}}' agent-box-agent:local 2>/dev/null || true)"
+    agent_gui="$(docker inspect -f '{{index .Config.Labels "agentbox.gui"}}' agent-box-agent:local 2>/dev/null || true)"
     fw_base="$(docker inspect -f '{{index .Config.Labels "agentbox.base"}}' agent-box-firewall:local 2>/dev/null || true)"
 
     if [ "${ui_uid}" != "${PUID}" ] || [ "${ui_base}" != "${expected_base}" ] || \
        [ "${agent_uid}" != "${PUID}" ] || [ "${agent_base}" != "${expected_base}" ] || \
-       [ "${fw_base}" != "${expected_base}" ]; then
+       [ "${agent_gui}" != "1" ] || [ "${fw_base}" != "${expected_base}" ]; then
         echo "[agent-box] Build automatico immagini Ubuntu 26.04 per ${HOST_USER} (UID=${PUID}, GID=${PGID})..."
         docker compose -f "${SCRIPT_DIR}/docker-compose.yml" build \
             --build-arg PUID="${PUID}" \
@@ -738,7 +749,16 @@ case "${CMD}" in
         start_stack "${TARGET}"
         dc exec agent bash
         ;;
-    claude|grok|agy|pi|gemini|opencode|aider|hermes)
+    claude|grok|agy|pi|gemini|opencode|aider|hermes|\
+    claude-desktop|claude-gui|\
+    chatgpt-desktop|chatgpt-gui|codex-desktop|codex-gui|\
+    opencode-desktop|opencode-gui|opencode-web|\
+    aider-desktop|aider-gui|\
+    grok-desktop|grok-gui|\
+    gemini-desktop|gemini-gui|\
+    agy-desktop|agy-gui|antigravity-desktop|antigravity-gui|\
+    pi-desktop|pi-gui|\
+    hermes-desktop|hermes-gui)
         run_agent_cmd "${CMD}" "$@"
         ;;
     chatgpt|codex)

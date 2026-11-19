@@ -107,6 +107,48 @@ RUN if [ "${INSTALL_HERMES_AT_BUILD}" = "1" ]; then \
         chmod +x /usr/local/bin/hermes; \
     fi
 
+# 4c. Versioni GUI / Desktop degli agenti AI (Claude Desktop, ChatGPT/Codex App,
+#     OpenCode Desktop, Google Chrome App-Mode per Grok/Gemini/Aider GUI, Alacritty)
+COPY keyrings/ /usr/share/keyrings/
+RUN set -eux; \
+    chmod 0644 /usr/share/keyrings/claude-desktop-archive-keyring.asc /usr/share/keyrings/chatgpt-archive-keyring.gpg; \
+    echo "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/claude-desktop-archive-keyring.asc] https://downloads.claude.ai/claude-desktop/apt/stable stable main" > /etc/apt/sources.list.d/claude-desktop.list; \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/chatgpt-archive-keyring.gpg] https://persistent.oaistatic.com/codex-app-prod/linux/deb stable main" > /etc/apt/sources.list.d/chatgpt.list; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        claude-desktop \
+        chatgpt \
+        alacritty \
+        dbus-x11 \
+        xdg-utils \
+        libgtk-3-0t64 \
+        libnotify4 \
+        libxss1 \
+        libatspi2.0-0t64 \
+        libsecret-1-0 \
+        libcups2t64 \
+        libxcb-dri3-0 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxrandr2 \
+        fonts-dejavu-core \
+        fonts-liberation; \
+    ARCH="$(dpkg --print-architecture)"; \
+    if [ "${ARCH}" = "amd64" ] || [ "${ARCH}" = "arm64" ]; then \
+        curl -fsSL -o /tmp/opencode-desktop.deb "https://github.com/anomalyco/opencode/releases/latest/download/opencode-desktop-linux-${ARCH}.deb" && \
+        apt-get install -y --no-install-recommends /tmp/opencode-desktop.deb && \
+        rm -f /tmp/opencode-desktop.deb; \
+    fi; \
+    if [ "${ARCH}" = "amd64" ]; then \
+        curl -fsSL -o /tmp/google-chrome.deb "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" && \
+        apt-get install -y --no-install-recommends /tmp/google-chrome.deb && \
+        rm -f /tmp/google-chrome.deb; \
+    fi; \
+    rm -rf /var/lib/apt/lists/*
+
+LABEL agentbox.gui="1"
+
 # 5. Crea utente non-root "agent" con UID/GID corrispondenti all'utente host
 RUN (userdel -r ubuntu 2>/dev/null || true) && \
     (groupdel ubuntu 2>/dev/null || true) && \
@@ -132,7 +174,21 @@ ENV HOME=/home/agent \
     PATH="/home/agent/.npm-global/bin:/home/agent/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY agent-gui-launcher.sh /usr/local/bin/agent-gui-launcher
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/agent-gui-launcher && \
+    for cmd in \
+        claude-desktop claude-gui \
+        chatgpt-desktop chatgpt-gui codex-desktop codex-gui \
+        opencode-desktop opencode-gui opencode-web \
+        aider-desktop aider-gui \
+        grok-desktop grok-gui \
+        gemini-desktop gemini-gui \
+        agy-desktop agy-gui antigravity-desktop antigravity-gui \
+        pi-desktop pi-gui \
+        hermes-desktop hermes-gui \
+        agent-webapp-open; do \
+        ln -sf /usr/local/bin/agent-gui-launcher "/usr/local/bin/${cmd}"; \
+    done
 
 USER ${PUID}:${PGID}
 WORKDIR /workspace

@@ -66,6 +66,17 @@ Quando esci da un agente specifico (`claude`, `codex`, `opencode`, ecc.), **rima
 ./agent-box.sh aider /percorso/mio-progetto
 ./agent-box.sh hermes /percorso/mio-progetto    # Hermes Agent (Nous Research)
 
+# Oppure avvia direttamente le versioni GUI / Desktop in finestra X11 / XWayland / Wayland:
+./agent-box.sh claude-desktop /percorso/mio-progetto    # Claude Desktop ufficiale (alias: claude-gui)
+./agent-box.sh chatgpt-desktop /percorso/mio-progetto   # ChatGPT / Codex Desktop ufficiale (alias: codex-desktop, chatgpt-gui)
+./agent-box.sh opencode-desktop /percorso/mio-progetto  # OpenCode Desktop / Web GUI (alias: opencode-gui, opencode-web)
+./agent-box.sh aider-gui /percorso/mio-progetto         # Aider Browser GUI (alias: aider-desktop)
+./agent-box.sh grok-desktop /percorso/mio-progetto      # Grok Desktop App-Mode (alias: grok-gui)
+./agent-box.sh gemini-desktop /percorso/mio-progetto    # Gemini Desktop App-Mode (alias: gemini-gui)
+./agent-box.sh agy-desktop /percorso/mio-progetto       # Antigravity in finestra grafica dedicata (alias: agy-gui)
+./agent-box.sh pi-desktop /percorso/mio-progetto        # Pi Agent in finestra grafica dedicata (alias: pi-gui)
+./agent-box.sh hermes-desktop /percorso/mio-progetto    # Hermes Agent in finestra grafica dedicata (alias: hermes-gui)
+
 # Opzioni avanzate (volumi extra sul disco, core CPU, iGPU/GPU, display X11/Wayland):
 ./agent-box.sh -v /percorso/dati:/dati:ro --cpus 4 --gpu auto --display auto claude /percorso/mio-progetto
 
