@@ -53,14 +53,27 @@ echo "[opensnitch-ui] Finestra principale all'avvio: ${OPENSNITCH_SHOW_MAIN_WIND
 # Bridge audio tramite FIFO PCM unidirezionali (il socket PulseAudio dell'host non viene MAI esposto ad agent)
 # Nota di sicurezza: AGENT_MIC viene passato dall'host a opensnitch-ui, quindi l'agente non può auto-abilitare il microfono
 if [ "${AGENT_AUDIO:-1}" = "1" ] && [ -d /run/agent-audio ] && command -v pacat >/dev/null 2>&1; then
+    # Disabilita SHM tra container e host (evita audio muto tra IPC namespace diversi su PipeWire/PulseAudio)
+    cat <<'EOF' > /tmp/pulse-client.conf
+enable-shm = no
+autospawn = no
+EOF
     (
         HOST_PULSE_SOCK="/run/user/$(id -u)/pulse/native"
         export PULSE_SERVER="unix:${HOST_PULSE_SOCK}"
+        export PULSE_CLIENTCONFIG="/tmp/pulse-client.conf"
+        export XDG_CONFIG_HOME="/tmp"
+        if [ -r /tmp/.pulse-cookie ]; then
+            export PULSE_COOKIE="/tmp/.pulse-cookie"
+        fi
         while true; do
             if [ -p /run/agent-audio/playback.fifo ] && [ -S "${HOST_PULSE_SOCK}" ]; then
-                pacat --playback --raw --format=s16le --rate=48000 --channels=2 --latency-msec=40 /run/agent-audio/playback.fifo 2>/dev/null || sleep 2
+                echo "[opensnitch-ui] Audio bridge playback attivo -> ${HOST_PULSE_SOCK}"
+                pacat --playback --raw --format=s16le --rate=48000 --channels=2 --latency-msec=40 \
+                    --property=application.name=agent-box < /run/agent-audio/playback.fifo || true
+                sleep 1
             else
-                sleep 2
+                sleep 1
             fi
         done
     ) &
@@ -68,11 +81,19 @@ if [ "${AGENT_AUDIO:-1}" = "1" ] && [ -d /run/agent-audio ] && command -v pacat 
         (
             HOST_PULSE_SOCK="/run/user/$(id -u)/pulse/native"
             export PULSE_SERVER="unix:${HOST_PULSE_SOCK}"
+            export PULSE_CLIENTCONFIG="/tmp/pulse-client.conf"
+            export XDG_CONFIG_HOME="/tmp"
+            if [ -r /tmp/.pulse-cookie ]; then
+                export PULSE_COOKIE="/tmp/.pulse-cookie"
+            fi
             while true; do
                 if [ -p /run/agent-audio/capture.fifo ] && [ -S "${HOST_PULSE_SOCK}" ]; then
-                    pacat --record --raw --format=s16le --rate=48000 --channels=1 --latency-msec=40 /run/agent-audio/capture.fifo 2>/dev/null || sleep 2
+                    echo "[opensnitch-ui] Audio bridge microfono attivo <- ${HOST_PULSE_SOCK}"
+                    pacat --record --raw --format=s16le --rate=48000 --channels=1 --latency-msec=40 \
+                        --property=application.name=agent-box-mic > /run/agent-audio/capture.fifo || true
+                    sleep 1
                 else
-                    sleep 2
+                    sleep 1
                 fi
             done
         ) &
@@ -80,21 +101,41 @@ if [ "${AGENT_AUDIO:-1}" = "1" ] && [ -d /run/agent-audio ] && command -v pacat 
 fi
 
 # Server X11 annidato e isolato (Xephyr :99) per il container agent:
-# impedisce agli agenti di fare screenshot degli schermi host, keylogging o cliccare sui popup OpenSnitch
+# - Impedisce agli agenti di fare screenshot degli schermi host, keylogging o cliccare sui popup OpenSnitch
+# - Permette ad agent di usare xdotool (mouse/tastiera) e xrandr dentro il monitor virtuale :99
 if [ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ] && command -v Xephyr >/dev/null 2>&1; then
     XEPHYR_DISPLAY="${AGENT_XEPHYR_DISPLAY:-:99}"
     XEPHYR_SCREEN="${AGENT_SCREEN_SIZE:-1600x900}"
-    echo "[opensnitch-ui] Avvio display sandbox isolato Xephyr ${XEPHYR_DISPLAY} (${XEPHYR_SCREEN})..."
+    XEPHYR_FS="${AGENT_FULLSCREEN:-0}"
+    echo "[opensnitch-ui] Avvio monitor virtuale isolato Xephyr ${XEPHYR_DISPLAY} (${XEPHYR_SCREEN}, fullscreen=${XEPHYR_FS})..."
     rm -f "/tmp/.X11-unix/X${XEPHYR_DISPLAY#:}" "/tmp/.X${XEPHYR_DISPLAY#:}-lock" 2>/dev/null || true
     (
         while true; do
-            Xephyr "${XEPHYR_DISPLAY}" \
-                -screen "${XEPHYR_SCREEN}" \
-                -resizeable \
-                -ac \
-                -nolisten tcp \
-                -title "Agent-Box Sandbox Display (${XEPHYR_DISPLAY})" \
-                2>/dev/null || sleep 2
+            if [ "${XEPHYR_FS}" = "1" ]; then
+                Xephyr "${XEPHYR_DISPLAY}" \
+                    -fullscreen \
+                    -host-cursor \
+                    -ac \
+                    -nolisten tcp \
+                    +extension RANDR \
+                    +extension GLX \
+                    +extension RENDER \
+                    -title "Agent-Box Virtual Monitor (${XEPHYR_DISPLAY})" \
+                    2>&1 || true
+            else
+                Xephyr "${XEPHYR_DISPLAY}" \
+                    -screen "${XEPHYR_SCREEN}" \
+                    -resizeable \
+                    -host-cursor \
+                    -ac \
+                    -nolisten tcp \
+                    +extension RANDR \
+                    +extension GLX \
+                    +extension RENDER \
+                    -title "Agent-Box Virtual Monitor (${XEPHYR_DISPLAY})" \
+                    2>&1 || true
+            fi
+            sleep 2
         done
     ) &
 fi
