@@ -201,6 +201,10 @@ detect_user_and_display() {
         "${RUNTIME_DIR}/x11-isolated"
     chmod 0777 "${SCRIPT_DIR}/opensnitch/socket" 2>/dev/null || true
     chmod 1777 "${RUNTIME_DIR}/x11-isolated" 2>/dev/null || true
+    # Pre-crea i FIFO audio una sola volta così opensnitch-ui e agent condividono sempre lo stesso inode
+    [ -p "${RUNTIME_DIR}/audio/playback.fifo" ] || { rm -f "${RUNTIME_DIR}/audio/playback.fifo"; mkfifo "${RUNTIME_DIR}/audio/playback.fifo"; }
+    [ -p "${RUNTIME_DIR}/audio/capture.fifo" ] || { rm -f "${RUNTIME_DIR}/audio/capture.fifo"; mkfifo "${RUNTIME_DIR}/audio/capture.fifo"; }
+    chmod 0666 "${RUNTIME_DIR}/audio/playback.fifo" "${RUNTIME_DIR}/audio/capture.fifo" 2>/dev/null || true
 
     # Inizializza ./hosts modificabile se non esiste ancora
     if [ ! -f "${SCRIPT_DIR}/hosts" ]; then
@@ -527,6 +531,13 @@ generate_runtime_override() {
             if [ -S "/tmp/.X11-unix/X${host_disp_num}" ]; then
                 echo "      - \"/tmp/.X11-unix/X${host_disp_num}:/tmp/.X11-unix/X${host_disp_num}:ro\""
             fi
+            if [ -S "${XDG_RUNTIME_DIR}/pulse/native" ]; then
+                echo "      - \"${XDG_RUNTIME_DIR}/pulse/native:/run/user/${PUID}/pulse/native:rw\""
+            fi
+        elif [ -S "${XDG_RUNTIME_DIR}/pulse/native" ]; then
+            echo "  opensnitch-ui:"
+            echo "    volumes:"
+            echo "      - \"${XDG_RUNTIME_DIR}/pulse/native:/run/user/${PUID}/pulse/native:rw\""
         fi
 
         echo "  agent:"
@@ -717,7 +728,20 @@ start_stack() {
     proj_screen="$(read_env_var "${project_env}" "AGENT_SCREEN_SIZE")"
     [ -n "${proj_screen}" ] && screen_size="${proj_screen}"
     [ -n "${CLI_SCREEN_SIZE}" ] && screen_size="${CLI_SCREEN_SIZE}"
-    export AGENT_SCREEN_SIZE="${screen_size:-1600x900}"
+    screen_size="${screen_size:-auto}"
+
+    # Se AGENT_SCREEN_SIZE=auto, rileva la risoluzione del monitor principale sull'host
+    if [ "${screen_size}" = "auto" ]; then
+        local detected_res=""
+        if command -v xrandr >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then
+            detected_res="$(xrandr --current 2>/dev/null | awk '/ connected primary/{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+x[0-9]+\+/){sub(/\+.*/,"",$i); print $i; exit}}' || true)"
+            if [ -z "${detected_res}" ]; then
+                detected_res="$(xrandr --current 2>/dev/null | awk '/\*/{print $1; exit}' || true)"
+            fi
+        fi
+        screen_size="${detected_res:-1600x900}"
+    fi
+    export AGENT_SCREEN_SIZE="${screen_size}"
 
     local fullscreen_mode="${AGENT_FULLSCREEN:-}"
     [ -z "${fullscreen_mode}" ] && fullscreen_mode="$(read_env_var "${SCRIPT_DIR}/.env" "AGENT_FULLSCREEN")"

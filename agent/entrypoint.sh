@@ -140,7 +140,11 @@ fi
 if [ "${AGENT_AUDIO:-1}" = "1" ] && command -v pulseaudio >/dev/null 2>&1; then
     RUNTIME_USER_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
     mkdir -p "${RUNTIME_USER_DIR}/pulse" /run/agent-audio 2>/dev/null || true
-    rm -f /run/agent-audio/playback.fifo /run/agent-audio/capture.fifo /run/agent-audio/mic.enabled 2>/dev/null || true
+    # Non rimuovere playback.fifo/capture.fifo se esistono già come FIFO: mantiene lo stesso inode condiviso con opensnitch-ui!
+    [ -p /run/agent-audio/playback.fifo ] || { rm -f /run/agent-audio/playback.fifo 2>/dev/null || true; mkfifo /run/agent-audio/playback.fifo 2>/dev/null || true; }
+    if [ "${AGENT_MIC:-0}" = "1" ]; then
+        [ -p /run/agent-audio/capture.fifo ] || { rm -f /run/agent-audio/capture.fifo 2>/dev/null || true; mkfifo /run/agent-audio/capture.fifo 2>/dev/null || true; }
+    fi
     if [ ! -S "${RUNTIME_USER_DIR}/pulse/native" ]; then
         PA_ARGS=(
             --daemonize=yes
@@ -234,6 +238,26 @@ EOF
             sleep 1
         done
     ) &
+    # Watcher RandR: quando ridimensioni o massimizzi la finestra Xephyr sull'host,
+    # aggiorna automaticamente la risoluzione del monitor virtuale :99 per tutte le app al suo interno
+    if command -v xrandr >/dev/null 2>&1; then
+        (
+            LAST_PREF=""
+            while true; do
+                if [ -S "/tmp/.X11-unix/X${DISPLAY#:}" ]; then
+                    OUT_INFO="$(xrandr -display "${DISPLAY}" --query 2>/dev/null || true)"
+                    # Estrae la modalità preferita (+) e quella corrente (*)
+                    PREF_MODE="$(printf '%s\n' "${OUT_INFO}" | awk '/\+/{print $1; exit}')"
+                    CURR_MODE="$(printf '%s\n' "${OUT_INFO}" | awk '/\*/{print $1; exit}')"
+                    if [ -n "${PREF_MODE}" ] && [ "${PREF_MODE}" != "${CURR_MODE}" ] && [ "${PREF_MODE}" != "${LAST_PREF}" ]; then
+                        xrandr -display "${DISPLAY}" --auto 2>/dev/null || true
+                        LAST_PREF="${PREF_MODE}"
+                    fi
+                fi
+                sleep 1
+            done
+        ) &
+    fi
 fi
 
 exec "$@"
