@@ -37,6 +37,8 @@ services:
       - XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-wayland}
       - QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-wayland;xcb}
       - QT_X11_NO_MITSHM=1
+      - QT_XCB_GL_INTEGRATION=none
+      - LIBGL_ALWAYS_SOFTWARE=1
       - XAUTHORITY=/run/opensnitch/.Xauthority
       - DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${PUID:-1000}/bus
       - OPENSNITCH_SHOW_MAIN_WINDOW=${OPENSNITCH_SHOW_MAIN_WINDOW:-1}
@@ -162,6 +164,9 @@ services:
       - ./certs:/etc/agent-box/certs:ro
       # Home persistente isolata (tutta dentro la cartella del progetto):
       - ./agent-home:/home/agent:rw
+      # Script entrypoint e launcher GUI sempre allineati col repository:
+      - ./agent/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+      - ./agent/agent-gui-launcher.sh:/usr/local/bin/agent-gui-launcher:ro
     pids_limit: 512
     mem_limit: ${AGENT_MEM_LIMIT:-8g}
     cpus: ${AGENT_CPUS:-0}

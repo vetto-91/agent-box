@@ -42,6 +42,10 @@ elif [ -z "${QT_QPA_PLATFORM:-}" ] || [ "${QT_QPA_PLATFORM}" = "wayland;xcb" ]; 
     export QT_QPA_PLATFORM="xcb"
 fi
 
+export QT_X11_NO_MITSHM=1
+export QT_XCB_GL_INTEGRATION="${QT_XCB_GL_INTEGRATION:-none}"
+export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
+
 echo "[opensnitch-ui] Utente: $(id)"
 echo "[opensnitch-ui] QT_QPA_PLATFORM=${QT_QPA_PLATFORM}"
 echo "[opensnitch-ui] Finestra principale all'avvio: ${OPENSNITCH_SHOW_MAIN_WINDOW:-1}"

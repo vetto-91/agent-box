@@ -20,7 +20,7 @@ fi
 chmod 0644 "${CA_BUNDLE}"
 
 # 2. Prepara le directory utente nel volume persistente /home/agent
-mkdir -p \
+if ! mkdir -p \
     "${HOME}/.cargo/bin" \
     "${HOME}/.local/share/keyrings" \
     "${HOME}/.npm-global/bin" \
@@ -30,7 +30,22 @@ mkdir -p \
     "${HOME}/.config/opencode" \
     "${HOME}/.pi/agent" \
     "${HOME}/.codex" \
-    "${HOME}/.gemini"
+    "${HOME}/.gemini" 2>/dev/null; then
+    echo "[agent-box] ATTENZIONE: /home/agent non è scrivibile da $(id -u):$(id -g) (probabile mismatch UID/GID in ./agent-home)."
+    echo "[agent-box] Uso fallback temporaneo in /tmp/agent-home (esegui ./agent-box.sh per correggere automaticamente i permessi di ./agent-home)."
+    export HOME="/tmp/agent-home"
+    mkdir -p \
+        "${HOME}/.cargo/bin" \
+        "${HOME}/.local/share/keyrings" \
+        "${HOME}/.npm-global/bin" \
+        "${HOME}/.local/bin" \
+        "${HOME}/.cache/npm" \
+        "${HOME}/.cache/uv" \
+        "${HOME}/.config/opencode" \
+        "${HOME}/.pi/agent" \
+        "${HOME}/.codex" \
+        "${HOME}/.gemini"
+fi
 
 # 3. Configura prompt sandbox e supporto TLS opzionale in .bashrc
 if [ ! -f "${HOME}/.bashrc" ] || ! grep -q "AGENT-BOX" "${HOME}/.bashrc" 2>/dev/null; then

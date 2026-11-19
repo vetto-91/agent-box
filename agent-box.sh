@@ -187,7 +187,7 @@ detect_user_and_display() {
         "${SCRIPT_DIR}/opensnitch/ui-config" \
         "${SCRIPT_DIR}/opensnitch/socket" \
         "${RUNTIME_DIR}"
-    chmod 0777 "${SCRIPT_DIR}/opensnitch/socket"
+    chmod 0777 "${SCRIPT_DIR}/opensnitch/socket" 2>/dev/null || true
 
     # Inizializza ./hosts modificabile se non esiste ancora
     if [ ! -f "${SCRIPT_DIR}/hosts" ]; then
@@ -195,6 +195,56 @@ detect_user_and_display() {
 127.0.0.1 localhost agent-box
 ::1 localhost ip6-localhost ip6-loopback
 EOF
+    fi
+
+    # Ripara automaticamente eventuali file/cartelle creati con UID/GID diverso (es. root o 1000 da docker compose diretto)
+    local need_chown=0
+    if [ ! -w "${SCRIPT_DIR}/agent-home" ] || \
+       [ -n "$(find "${SCRIPT_DIR}/agent-home" "${SCRIPT_DIR}/opensnitch/ui-config" "${RUNTIME_DIR}" \( -not -uid "${PUID}" -o -not -gid "${PGID}" \) -print -quit 2>/dev/null || true)" ]; then
+        need_chown=1
+    fi
+    if [ "${need_chown}" -eq 1 ]; then
+        echo "[agent-box] Allineamento permessi cartelle locali a ${HOST_USER} (${PUID}:${PGID})..."
+        if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+            chown -R "${PUID}:${PGID}" \
+                "${SCRIPT_DIR}/agent-home" \
+                "${SCRIPT_DIR}/opensnitch/ui-config" \
+                "${SCRIPT_DIR}/opensnitch/socket" \
+                "${RUNTIME_DIR}" \
+                "${SCRIPT_DIR}/hosts" 2>/dev/null || true
+            chmod 0777 "${SCRIPT_DIR}/opensnitch/socket" 2>/dev/null || true
+        else
+            local helper_img=""
+            for candidate_img in agent-box-firewall:local agent-box-ui:local ubuntu:26.04; do
+                if docker image inspect "${candidate_img}" >/dev/null 2>&1; then
+                    helper_img="${candidate_img}"
+                    break
+                fi
+            done
+            if [ -n "${helper_img}" ]; then
+                docker run --rm -u 0:0 \
+                    -v "${SCRIPT_DIR}:/fix" \
+                    --entrypoint /bin/sh "${helper_img}" -c \
+                    "chown -R ${PUID}:${PGID} /fix/agent-home /fix/opensnitch/ui-config /fix/opensnitch/socket /fix/.runtime /fix/hosts 2>/dev/null || true; chmod 0777 /fix/opensnitch/socket 2>/dev/null || true"
+            fi
+        fi
+    fi
+
+    # Sincronizza PUID e PGID in .env (ignorato da git) così anche i comandi 'docker compose' diretti usano l'UID/GID corretto
+    if [ ! -f "${SCRIPT_DIR}/.env" ] && [ -f "${SCRIPT_DIR}/.env.example" ]; then
+        cp "${SCRIPT_DIR}/.env.example" "${SCRIPT_DIR}/.env"
+    fi
+    if [ -f "${SCRIPT_DIR}/.env" ]; then
+        if grep -qE '^PUID=' "${SCRIPT_DIR}/.env"; then
+            sed -i "s/^PUID=.*/PUID=${PUID}/" "${SCRIPT_DIR}/.env"
+        else
+            printf '\nPUID=%s\n' "${PUID}" >> "${SCRIPT_DIR}/.env"
+        fi
+        if grep -qE '^PGID=' "${SCRIPT_DIR}/.env"; then
+            sed -i "s/^PGID=.*/PGID=${PGID}/" "${SCRIPT_DIR}/.env"
+        else
+            printf 'PGID=%s\n' "${PGID}" >> "${SCRIPT_DIR}/.env"
+        fi
     fi
 
     # Copia il cookie Xauthority attivo (XWayland / X11) dentro opensnitch/socket/.Xauthority
