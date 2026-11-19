@@ -147,7 +147,23 @@ RUN set -eux; \
     fi; \
     rm -rf /var/lib/apt/lists/*
 
-LABEL agentbox.gui="1"
+# 4d. GNOME Keyring per Claude Desktop e Rust + Cargo dal sito ufficiale (https://sh.rustup.rs) via curl
+ENV RUSTUP_HOME=/opt/rust/rustup
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        gnome-keyring \
+        libsecret-tools \
+        libcap2-bin; \
+    setcap -r /usr/bin/gnome-keyring-daemon 2>/dev/null || true; \
+    rm -rf /var/lib/apt/lists/*; \
+    mkdir -p /opt/rust; \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+        env RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo \
+        sh -s -- -y --default-toolchain stable --profile default --no-modify-path; \
+    chmod -R a+rX /opt/rust
+
+LABEL agentbox.gui="2"
 
 # 5. Crea utente non-root "agent" con UID/GID corrispondenti all'utente host
 RUN (userdel -r ubuntu 2>/dev/null || true) && \
@@ -167,11 +183,13 @@ ENV HOME=/home/agent \
     UV_TOOL_BIN_DIR=/home/agent/.local/bin \
     PIPX_HOME=/home/agent/.local/pipx \
     PIPX_BIN_DIR=/home/agent/.local/bin \
+    CARGO_HOME=/home/agent/.cargo \
+    RUSTUP_HOME=/opt/rust/rustup \
     SSL_CERT_FILE=/tmp/ca-certificates.crt \
     REQUESTS_CA_BUNDLE=/tmp/ca-certificates.crt \
     CURL_CA_BUNDLE=/tmp/ca-certificates.crt \
     NODE_EXTRA_CA_CERTS=/tmp/ca-certificates.crt \
-    PATH="/home/agent/.npm-global/bin:/home/agent/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    PATH="/home/agent/.cargo/bin:/opt/rust/cargo/bin:/home/agent/.npm-global/bin:/home/agent/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY agent-gui-launcher.sh /usr/local/bin/agent-gui-launcher

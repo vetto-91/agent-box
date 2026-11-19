@@ -200,7 +200,7 @@ ensure_images_match_user() {
 
     if [ "${ui_uid}" != "${PUID}" ] || [ "${ui_base}" != "${expected_base}" ] || \
        [ "${agent_uid}" != "${PUID}" ] || [ "${agent_base}" != "${expected_base}" ] || \
-       [ "${agent_gui}" != "1" ] || [ "${fw_base}" != "${expected_base}" ]; then
+       [ "${agent_gui}" != "2" ] || [ "${fw_base}" != "${expected_base}" ]; then
         echo "[agent-box] Build automatico immagini Ubuntu 26.04 per ${HOST_USER} (UID=${PUID}, GID=${PGID})..."
         docker compose -f "${SCRIPT_DIR}/docker-compose.yml" build \
             --build-arg PUID="${PUID}" \

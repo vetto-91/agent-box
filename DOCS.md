@@ -90,7 +90,7 @@ Quando esci da un agente specifico (`claude`, `codex`, `grok`, `agy`, `pi`, `gem
 | `opencode` | Avvia **OpenCode** (`opencode-ai`). |
 | `aider` | Avvia **Aider** (`aider-chat`, installato al primo avvio in `/home/agent/.local` tramite `uv`, oppure al build con `INSTALL_AIDER_AT_BUILD=1`). |
 | `hermes` | Avvia **Hermes Agent** di Nous Research (`hermes-agent`, installato al primo avvio tramite `uv`, oppure al build con `INSTALL_HERMES_AT_BUILD=1`). |
-| `claude-desktop` / `claude-gui` | Avvia **Claude Desktop** ufficiale per Linux (GUI Electron con supporto Claude Code e MCP). |
+| `claude-desktop` / `claude-gui` | Avvia **Claude Desktop** ufficiale per Linux (GUI Electron con supporto Claude Code, MCP e **GNOME Keyring** preconfigurato per la persistenza del login). |
 | `chatgpt-desktop` / `chatgpt-gui` / `codex-desktop` / `codex-gui` | Avvia **ChatGPT / Codex Desktop App** ufficiale di OpenAI per Linux. |
 | `opencode-desktop` / `opencode-gui` / `opencode-web` | Avvia **OpenCode Desktop** ufficiale per Linux (o l'interfaccia web `opencode web`). |
 | `aider-desktop` / `aider-gui` | Avvia l'interfaccia grafica web di **Aider** (`aider --gui`) in una finestra desktop dedicata. |
@@ -194,7 +194,7 @@ Il progetto è completamente autonomo e non crea volumi Docker esterni sul siste
 | Percorso | Scopo |
 | :--- | :--- |
 | `./workspace` (o `[cartella_progetto]`) | Directory del progetto montata in `/workspace` (più eventuali volumi extra via `-v` / `AGENT_EXTRA_VOLUMES`). |
-| `./agent-home` | `/home/agent`: conserva configurazioni, login, cache `npm`/`uv` e installazioni locali di `aider` e `hermes`. |
+| `./agent-home` | `/home/agent`: conserva configurazioni, login, portachiavi **GNOME Keyring** (`~/.local/share/keyrings`), cache `cargo`/`npm`/`uv` e installazioni locali di `aider` e `hermes`. |
 | `./ollama-data` | `/root/.ollama`: modelli del servizio opzionale `ollama`. |
 | `./opensnitch/rules` | Regole permanenti di OpenSnitch (`000-allow-loopback.json`, `001-auto-dns.json`, ecc.). |
 | `./opensnitch/ui-config` | Preferenze della GUI di OpenSnitch. |

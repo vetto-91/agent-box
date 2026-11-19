@@ -21,6 +21,8 @@ chmod 0644 "${CA_BUNDLE}"
 
 # 2. Prepara le directory utente nel volume persistente /home/agent
 mkdir -p \
+    "${HOME}/.cargo/bin" \
+    "${HOME}/.local/share/keyrings" \
     "${HOME}/.npm-global/bin" \
     "${HOME}/.local/bin" \
     "${HOME}/.cache/npm" \

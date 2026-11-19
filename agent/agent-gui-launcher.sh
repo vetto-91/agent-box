@@ -12,10 +12,24 @@ if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && command -v dbus-run-session >/dev/n
     exec dbus-run-session -- "$0" "$@"
 fi
 
+# Inizializza e sblocca GNOME Keyring (Secret Service API) per Claude Desktop e altre app Electron
+if command -v gnome-keyring-daemon >/dev/null 2>&1; then
+    mkdir -p "${HOME}/.local/share/keyrings" "${HOME}/.cache"
+    chmod 0700 "${HOME}/.local/share/keyrings"
+    if [ ! -f "${HOME}/.local/share/keyrings/default" ]; then
+        printf 'login' > "${HOME}/.local/share/keyrings/default"
+    fi
+    if ! pgrep -u "$(id -u)" -x gnome-keyring-daemon >/dev/null 2>&1; then
+        eval "$(printf '\n' | gnome-keyring-daemon --unlock --components=secrets 2>/dev/null || true)"
+        export GNOME_KEYRING_CONTROL
+    fi
+fi
+
 OZONE_HINT="${ELECTRON_OZONE_PLATFORM_HINT:-auto}"
 COMMON_ELECTRON_FLAGS=(
     "--no-sandbox"
     "--disable-gpu-sandbox"
+    "--password-store=gnome-libsecret"
     "--ozone-platform-hint=${OZONE_HINT}"
 )
 
