@@ -42,6 +42,8 @@ services:
       - XAUTHORITY=/run/opensnitch/.Xauthority
       - DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${PUID:-1000}/bus
       - OPENSNITCH_SHOW_MAIN_WINDOW=${OPENSNITCH_SHOW_MAIN_WINDOW:-1}
+      - AGENT_AUDIO=${AGENT_AUDIO:-1}
+      - AGENT_MIC=${AGENT_MIC:-0}
     volumes:
       - ./opensnitch/socket:/run/opensnitch:rw
       - ./opensnitch/ui-config:/home/snitch/.config/opensnitch:rw

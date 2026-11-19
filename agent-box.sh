@@ -463,41 +463,18 @@ generate_runtime_override() {
         fi
     fi
 
-    # Risolvi dispositivi Audio / Microfono (/dev/snd e PulseAudio)
-    local use_host_pulse=0
+    # Risolvi dispositivi Audio / Microfono (sempre isolati tramite FIFO PCM unidirezionali,
+    # senza mai esporre il socket PulseAudio/PipeWire dell'host o i device di cattura /dev/snd/pcmC*D*c ad agent)
     if [ "${enable_audio}" -eq 1 ]; then
-        if [ "${enable_mic}" -eq 1 ]; then
-            # Microfono abilitato: espone /dev/snd completo (inclusi device di cattura pcmC*D*c)
-            # e il socket PulseAudio/PipeWire dell'host se presente
-            if [ -d /dev/snd ]; then
-                devices_list+=("/dev/snd:/dev/snd")
-                while IFS= read -r gid; do
-                    [ -n "${gid}" ] && [ "${gid}" != "0" ] && group_gids+=("${gid}")
-                done < <(find /dev/snd -maxdepth 1 -type c -exec stat -c '%g' {} + 2>/dev/null | sort -u || true)
-            fi
-            if [ -S "${XDG_RUNTIME_DIR}/pulse/native" ]; then
-                use_host_pulse=1
-                if [ -r "${HOST_HOME}/.config/pulse/cookie" ]; then
-                    cp -f "${HOST_HOME}/.config/pulse/cookie" "${RUNTIME_DIR}/pulse-cookie" 2>/dev/null || true
-                    chmod 0644 "${RUNTIME_DIR}/pulse-cookie" 2>/dev/null || true
-                else
-                    touch "${RUNTIME_DIR}/pulse-cookie"
-                    chmod 0644 "${RUNTIME_DIR}/pulse-cookie" 2>/dev/null || true
+        if [ -d /dev/snd ]; then
+            for snd_dev in /dev/snd/controlC* /dev/snd/pcmC*D*p /dev/snd/timer /dev/snd/seq; do
+                if [ -c "${snd_dev}" ]; then
+                    devices_list+=("${snd_dev}:${snd_dev}")
                 fi
-            fi
-        else
-            # Microfono DISABILITATO (default): monta SOLO i device ALSA di playback (pcmC*D*p, controlC*, timer, seq)
-            # escludendo fisicamente tutti i device di cattura (pcmC*D*c) e usando il bridge FIFO unidirezionale PulseAudio
-            if [ -d /dev/snd ]; then
-                for snd_dev in /dev/snd/controlC* /dev/snd/pcmC*D*p /dev/snd/timer /dev/snd/seq; do
-                    if [ -c "${snd_dev}" ]; then
-                        devices_list+=("${snd_dev}:${snd_dev}")
-                    fi
-                done
-                while IFS= read -r gid; do
-                    [ -n "${gid}" ] && [ "${gid}" != "0" ] && group_gids+=("${gid}")
-                done < <(find /dev/snd -maxdepth 1 -type c -exec stat -c '%g' {} + 2>/dev/null | sort -u || true)
-            fi
+            done
+            while IFS= read -r gid; do
+                [ -n "${gid}" ] && [ "${gid}" != "0" ] && group_gids+=("${gid}")
+            done < <(find /dev/snd -maxdepth 1 -type c -exec stat -c '%g' {} + 2>/dev/null | sort -u || true)
         fi
     fi
 
@@ -549,10 +526,6 @@ generate_runtime_override() {
         if [ "${use_wayland}" -eq 1 ]; then
             vol_lines+=("${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}:/run/user/${PUID}/${WAYLAND_DISPLAY}:rw")
         fi
-        if [ "${use_host_pulse}" -eq 1 ]; then
-            vol_lines+=("${XDG_RUNTIME_DIR}/pulse/native:/run/user/${PUID}/pulse/native:ro")
-            vol_lines+=("${RUNTIME_DIR}/pulse-cookie:/tmp/.pulse-cookie:ro")
-        fi
 
         if [ "${#vol_lines[@]}" -gt 0 ]; then
             echo "    volumes:"
@@ -593,9 +566,6 @@ EOF
         env_lines+=("AGENT_MIC=${enable_mic}")
         if [ "${enable_audio}" -eq 1 ]; then
             env_lines+=("PULSE_SERVER=unix:/run/user/${PUID}/pulse/native")
-            if [ "${use_host_pulse}" -eq 1 ]; then
-                env_lines+=("PULSE_COOKIE=/tmp/.pulse-cookie")
-            fi
         fi
         if [ "${use_x11}" -eq 1 ] || [ "${use_wayland}" -eq 1 ]; then
             env_lines+=("XDG_RUNTIME_DIR=/run/user/${PUID}")
@@ -630,6 +600,8 @@ EOF
     export AGENT_GPU_SUMMARY="iGPU=${enable_igpu}, NVIDIA=${enable_nvidia}"
     export AGENT_GUI_SUMMARY="mode=${display_mode} (Wayland=${use_wayland}, X11/XWayland=${use_x11})"
     export AGENT_AUDIO_SUMMARY="Audio=${enable_audio}, Microfono=${enable_mic}"
+    export AGENT_AUDIO="${enable_audio}"
+    export AGENT_MIC="${enable_mic}"
 }
 
 start_stack() {

@@ -50,8 +50,9 @@ echo "[opensnitch-ui] Utente: $(id)"
 echo "[opensnitch-ui] QT_QPA_PLATFORM=${QT_QPA_PLATFORM}"
 echo "[opensnitch-ui] Finestra principale all'avvio: ${OPENSNITCH_SHOW_MAIN_WINDOW:-1}"
 
-# Bridge audio unidirezionale (solo playback, zero accesso al microfono per l'agente)
-if [ -d /run/agent-audio ] && command -v pacat >/dev/null 2>&1; then
+# Bridge audio tramite FIFO PCM unidirezionali (il socket PulseAudio dell'host non viene MAI esposto ad agent)
+# Nota di sicurezza: AGENT_MIC viene passato dall'host a opensnitch-ui, quindi l'agente non può auto-abilitare il microfono
+if [ "${AGENT_AUDIO:-1}" = "1" ] && [ -d /run/agent-audio ] && command -v pacat >/dev/null 2>&1; then
     (
         HOST_PULSE_SOCK="/run/user/$(id -u)/pulse/native"
         export PULSE_SERVER="unix:${HOST_PULSE_SOCK}"
@@ -63,6 +64,19 @@ if [ -d /run/agent-audio ] && command -v pacat >/dev/null 2>&1; then
             fi
         done
     ) &
+    if [ "${AGENT_MIC:-0}" = "1" ]; then
+        (
+            HOST_PULSE_SOCK="/run/user/$(id -u)/pulse/native"
+            export PULSE_SERVER="unix:${HOST_PULSE_SOCK}"
+            while true; do
+                if [ -p /run/agent-audio/capture.fifo ] && [ -S "${HOST_PULSE_SOCK}" ]; then
+                    pacat --record --raw --format=s16le --rate=48000 --channels=1 --latency-msec=40 /run/agent-audio/capture.fifo 2>/dev/null || sleep 2
+                else
+                    sleep 2
+                fi
+            done
+        ) &
+    fi
 fi
 
 echo "[opensnitch-ui] Avvio interfaccia grafica su socket unix://${SOCKET_PATH} ..."

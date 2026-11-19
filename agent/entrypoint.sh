@@ -136,16 +136,26 @@ model = "${LOCAL_MODEL}"
 EOF
 fi
 
-# 5. Avvio server PulseAudio playback-only isolato quando l'audio è attivo ma il microfono è disabilitato (default)
-if [ "${AGENT_AUDIO:-1}" = "1" ] && [ "${AGENT_MIC:-0}" = "0" ] && command -v pulseaudio >/dev/null 2>&1; then
+# 5. Avvio server PulseAudio isolato nel container (nessun accesso diretto al socket PulseAudio dell'host)
+if [ "${AGENT_AUDIO:-1}" = "1" ] && command -v pulseaudio >/dev/null 2>&1; then
     RUNTIME_USER_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
     mkdir -p "${RUNTIME_USER_DIR}/pulse" /run/agent-audio 2>/dev/null || true
+    rm -f /run/agent-audio/playback.fifo /run/agent-audio/capture.fifo /run/agent-audio/mic.enabled 2>/dev/null || true
     if [ ! -S "${RUNTIME_USER_DIR}/pulse/native" ]; then
-        rm -f /run/agent-audio/playback.fifo 2>/dev/null || true
-        pulseaudio --daemonize=yes --disallow-exit=yes --exit-idle-time=-1 --log-level=error -n \
-            -L "module-native-protocol-unix auth-anonymous=1 socket=${RUNTIME_USER_DIR}/pulse/native" \
-            -L "module-pipe-sink file=/run/agent-audio/playback.fifo sink_name=agent_speaker format=s16le rate=48000 channels=2 use_system_clock_for_timing=yes" \
-            -L "module-always-sink" 2>/dev/null || true
+        PA_ARGS=(
+            --daemonize=yes
+            --disallow-exit=yes
+            --exit-idle-time=-1
+            --log-level=error
+            -n
+            -L "module-native-protocol-unix auth-anonymous=1 socket=${RUNTIME_USER_DIR}/pulse/native"
+            -L "module-pipe-sink file=/run/agent-audio/playback.fifo sink_name=agent_speaker format=s16le rate=48000 channels=2 use_system_clock_for_timing=yes"
+        )
+        if [ "${AGENT_MIC:-0}" = "1" ]; then
+            PA_ARGS+=(-L "module-pipe-source file=/run/agent-audio/capture.fifo source_name=agent_mic format=s16le rate=48000 channels=1")
+        fi
+        PA_ARGS+=(-L "module-always-sink")
+        pulseaudio "${PA_ARGS[@]}" 2>/dev/null || true
     fi
 fi
 
