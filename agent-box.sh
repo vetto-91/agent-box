@@ -12,6 +12,8 @@ CLI_EXTRA_VOLUMES=()
 CLI_CPUS=""
 CLI_GPU=""
 CLI_DISPLAY_MODE=""
+CLI_AUDIO=""
+CLI_MIC=""
 CLI_FW_PROFILE=""
 
 print_usage() {
@@ -19,7 +21,7 @@ print_usage() {
 Utilizzo: $0 [OPZIONI] <COMANDO> [cartella_progetto] [argomenti...]
 
 Comandi CLI:
-  build, shell, exec, fw-profile, test-popup, test-isolation, logs, stop
+  build, shell, exec, apt, fw-profile, test-popup, test-isolation, logs, stop
   claude, chatgpt (codex), grok, agy, pi, gemini, opencode, aider, hermes
 
 Comandi GUI / Desktop:
@@ -35,6 +37,10 @@ Opzioni:
   --display <auto|wayland|xwayland|x11|none>
                                         Modalità finestra grafica per agenti e app (default: auto)
   --no-gui                              Equivale a --display none
+  --audio <on|off|1|0>                  Abilita/disabilita uscita audio (default: on)
+  --no-audio                            Disabilita completamente audio e microfono
+  --mic [on|off|1|0]                    Abilita il microfono nel container (default: disabilitato)
+  --no-mic                              Forza il microfono disabilitato (default)
   --fw-profile <profilo>                Importa/attiva un profilo regole OpenSnitch da ./opensnitch-profiles:
                                           interattivo | disabilitato | solo-lan | solo-lan-ia |
                                           solo-internet | solo-provider-ia | solo-443-ipv4
@@ -186,7 +192,8 @@ detect_user_and_display() {
         "${SCRIPT_DIR}/opensnitch/rules" \
         "${SCRIPT_DIR}/opensnitch/ui-config" \
         "${SCRIPT_DIR}/opensnitch/socket" \
-        "${RUNTIME_DIR}"
+        "${RUNTIME_DIR}" \
+        "${RUNTIME_DIR}/audio"
     chmod 0777 "${SCRIPT_DIR}/opensnitch/socket" 2>/dev/null || true
 
     # Inizializza ./hosts modificabile se non esiste ancora
@@ -303,7 +310,7 @@ ensure_images_match_user() {
 
     if [ "${ui_uid}" != "${PUID}" ] || [ "${ui_base}" != "${expected_base}" ] || \
        [ "${agent_uid}" != "${PUID}" ] || [ "${agent_base}" != "${expected_base}" ] || \
-       [ "${agent_gui}" != "2" ] || [ "${fw_base}" != "${expected_base}" ]; then
+       [ "${agent_gui}" != "3" ] || [ "${fw_base}" != "${expected_base}" ]; then
         echo "[agent-box] Build automatico immagini Ubuntu 26.04 per ${HOST_USER} (UID=${PUID}, GID=${PGID})..."
         docker compose -f "${SCRIPT_DIR}/docker-compose.yml" build \
             --build-arg PUID="${PUID}" \
@@ -318,8 +325,31 @@ generate_runtime_override() {
     local gpu_mode="$1"
     local display_mode="$2"
     local shm_size="$3"
-    shift 3
+    local audio_mode="$4"
+    local mic_mode="$5"
+    shift 5
     local extra_volumes=("$@")
+
+    local enable_audio=1
+    case "${audio_mode}" in
+        0|off|false|none|no)
+            enable_audio=0
+            ;;
+        *)
+            enable_audio=1
+            ;;
+    esac
+
+    local enable_mic=0
+    case "${mic_mode}" in
+        1|on|true|yes)
+            enable_mic=1
+            enable_audio=1
+            ;;
+        *)
+            enable_mic=0
+            ;;
+    esac
 
     local has_wayland=0
     if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -S "${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}" ]; then
@@ -433,6 +463,44 @@ generate_runtime_override() {
         fi
     fi
 
+    # Risolvi dispositivi Audio / Microfono (/dev/snd e PulseAudio)
+    local use_host_pulse=0
+    if [ "${enable_audio}" -eq 1 ]; then
+        if [ "${enable_mic}" -eq 1 ]; then
+            # Microfono abilitato: espone /dev/snd completo (inclusi device di cattura pcmC*D*c)
+            # e il socket PulseAudio/PipeWire dell'host se presente
+            if [ -d /dev/snd ]; then
+                devices_list+=("/dev/snd:/dev/snd")
+                while IFS= read -r gid; do
+                    [ -n "${gid}" ] && [ "${gid}" != "0" ] && group_gids+=("${gid}")
+                done < <(find /dev/snd -maxdepth 1 -type c -exec stat -c '%g' {} + 2>/dev/null | sort -u || true)
+            fi
+            if [ -S "${XDG_RUNTIME_DIR}/pulse/native" ]; then
+                use_host_pulse=1
+                if [ -r "${HOST_HOME}/.config/pulse/cookie" ]; then
+                    cp -f "${HOST_HOME}/.config/pulse/cookie" "${RUNTIME_DIR}/pulse-cookie" 2>/dev/null || true
+                    chmod 0644 "${RUNTIME_DIR}/pulse-cookie" 2>/dev/null || true
+                else
+                    touch "${RUNTIME_DIR}/pulse-cookie"
+                    chmod 0644 "${RUNTIME_DIR}/pulse-cookie" 2>/dev/null || true
+                fi
+            fi
+        else
+            # Microfono DISABILITATO (default): monta SOLO i device ALSA di playback (pcmC*D*p, controlC*, timer, seq)
+            # escludendo fisicamente tutti i device di cattura (pcmC*D*c) e usando il bridge FIFO unidirezionale PulseAudio
+            if [ -d /dev/snd ]; then
+                for snd_dev in /dev/snd/controlC* /dev/snd/pcmC*D*p /dev/snd/timer /dev/snd/seq; do
+                    if [ -c "${snd_dev}" ]; then
+                        devices_list+=("${snd_dev}:${snd_dev}")
+                    fi
+                done
+                while IFS= read -r gid; do
+                    [ -n "${gid}" ] && [ "${gid}" != "0" ] && group_gids+=("${gid}")
+                done < <(find /dev/snd -maxdepth 1 -type c -exec stat -c '%g' {} + 2>/dev/null | sort -u || true)
+            fi
+        fi
+    fi
+
     # Deduplica GIDs
     local unique_gids=()
     if [ "${#group_gids[@]}" -gt 0 ]; then
@@ -481,6 +549,10 @@ generate_runtime_override() {
         if [ "${use_wayland}" -eq 1 ]; then
             vol_lines+=("${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}:/run/user/${PUID}/${WAYLAND_DISPLAY}:rw")
         fi
+        if [ "${use_host_pulse}" -eq 1 ]; then
+            vol_lines+=("${XDG_RUNTIME_DIR}/pulse/native:/run/user/${PUID}/pulse/native:ro")
+            vol_lines+=("${RUNTIME_DIR}/pulse-cookie:/tmp/.pulse-cookie:ro")
+        fi
 
         if [ "${#vol_lines[@]}" -gt 0 ]; then
             echo "    volumes:"
@@ -515,8 +587,16 @@ generate_runtime_override() {
 EOF
         fi
 
-        # Variabili d'ambiente grafiche e GPU
+        # Variabili d'ambiente grafiche, GPU e Audio/Microfono
         local env_lines=()
+        env_lines+=("AGENT_AUDIO=${enable_audio}")
+        env_lines+=("AGENT_MIC=${enable_mic}")
+        if [ "${enable_audio}" -eq 1 ]; then
+            env_lines+=("PULSE_SERVER=unix:/run/user/${PUID}/pulse/native")
+            if [ "${use_host_pulse}" -eq 1 ]; then
+                env_lines+=("PULSE_COOKIE=/tmp/.pulse-cookie")
+            fi
+        fi
         if [ "${use_x11}" -eq 1 ] || [ "${use_wayland}" -eq 1 ]; then
             env_lines+=("XDG_RUNTIME_DIR=/run/user/${PUID}")
             env_lines+=("XDG_SESSION_TYPE=${sess_type}")
@@ -549,6 +629,7 @@ EOF
 
     export AGENT_GPU_SUMMARY="iGPU=${enable_igpu}, NVIDIA=${enable_nvidia}"
     export AGENT_GUI_SUMMARY="mode=${display_mode} (Wayland=${use_wayland}, X11/XWayland=${use_x11})"
+    export AGENT_AUDIO_SUMMARY="Audio=${enable_audio}, Microfono=${enable_mic}"
 }
 
 start_stack() {
@@ -613,6 +694,22 @@ start_stack() {
     [ -n "${CLI_DISPLAY_MODE}" ] && display_mode="${CLI_DISPLAY_MODE}"
     display_mode="${display_mode:-auto}"
 
+    local audio_mode="${AGENT_AUDIO:-}"
+    [ -z "${audio_mode}" ] && audio_mode="$(read_env_var "${SCRIPT_DIR}/.env" "AGENT_AUDIO")"
+    local proj_audio
+    proj_audio="$(read_env_var "${project_env}" "AGENT_AUDIO")"
+    [ -n "${proj_audio}" ] && audio_mode="${proj_audio}"
+    [ -n "${CLI_AUDIO}" ] && audio_mode="${CLI_AUDIO}"
+    audio_mode="${audio_mode:-1}"
+
+    local mic_mode="${AGENT_MIC:-}"
+    [ -z "${mic_mode}" ] && mic_mode="$(read_env_var "${SCRIPT_DIR}/.env" "AGENT_MIC")"
+    local proj_mic
+    proj_mic="$(read_env_var "${project_env}" "AGENT_MIC")"
+    [ -n "${proj_mic}" ] && mic_mode="${proj_mic}"
+    [ -n "${CLI_MIC}" ] && mic_mode="${CLI_MIC}"
+    mic_mode="${mic_mode:-0}"
+
     local show_snitch_win="${OPENSNITCH_SHOW_MAIN_WINDOW:-}"
     [ -z "${show_snitch_win}" ] && show_snitch_win="$(read_env_var "${SCRIPT_DIR}/.env" "OPENSNITCH_SHOW_MAIN_WINDOW")"
     local proj_snitch
@@ -664,11 +761,11 @@ start_stack() {
         export NODE_TLS_REJECT_UNAUTHORIZED=0
     fi
 
-    generate_runtime_override "${gpu_mode}" "${display_mode}" "${shm_size}" "${all_extra_vols[@]}"
+    generate_runtime_override "${gpu_mode}" "${display_mode}" "${shm_size}" "${audio_mode}" "${mic_mode}" "${all_extra_vols[@]}"
 
     echo "[agent-box] Utente rilevato : ${HOST_USER} (UID=${PUID}, GID=${PGID})"
     echo "[agent-box] Sessione grafica: ${XDG_SESSION_TYPE} | Agente GUI: ${AGENT_GUI_SUMMARY}"
-    echo "[agent-box] Risorse CPU/GPU : ${AGENT_CPUS}/${host_cpus} core | ${AGENT_GPU_SUMMARY}"
+    echo "[agent-box] Risorse CPU/GPU : ${AGENT_CPUS}/${host_cpus} core | ${AGENT_GPU_SUMMARY} | ${AGENT_AUDIO_SUMMARY}"
     echo "[agent-box] Workspace       : ${WORKSPACE_DIR}"
     if [ "${#all_extra_vols[@]}" -gt 0 ]; then
         echo "[agent-box] Volumi extra    : ${all_extra_vols[*]}"
@@ -812,6 +909,40 @@ while [ $# -gt 0 ]; do
             ;;
         --no-gui)
             CLI_DISPLAY_MODE="none"
+            shift
+            ;;
+        --audio)
+            if [ $# -lt 2 ]; then
+                echo "[agent-box] ERRORE: --audio richiede un argomento (on|off|1|0)." >&2
+                exit 1
+            fi
+            CLI_AUDIO="$2"
+            shift 2
+            ;;
+        --audio=*)
+            CLI_AUDIO="${1#*=}"
+            shift
+            ;;
+        --no-audio)
+            CLI_AUDIO="0"
+            CLI_MIC="0"
+            shift
+            ;;
+        --mic)
+            if [ $# -ge 2 ] && [[ "$2" =~ ^(on|off|1|0|true|false|yes|no)$ ]]; then
+                CLI_MIC="$2"
+                shift 2
+            else
+                CLI_MIC="1"
+                shift
+            fi
+            ;;
+        --mic=*)
+            CLI_MIC="${1#*=}"
+            shift
+            ;;
+        --no-mic)
+            CLI_MIC="0"
             shift
             ;;
         --fw-profile)

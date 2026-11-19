@@ -46,6 +46,7 @@ services:
       - ./opensnitch/socket:/run/opensnitch:rw
       - ./opensnitch/ui-config:/home/snitch/.config/opensnitch:rw
       - ./opensnitch-profiles:/home/snitch/opensnitch-profiles:ro
+      - ./.runtime/audio:/run/agent-audio:rw
       - ./ui/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
       - ./ui/opensnitch-launcher.py:/usr/local/bin/opensnitch-launcher.py:ro
       - /tmp/.X11-unix:/tmp/.X11-unix:ro
@@ -171,6 +172,8 @@ services:
       - ./certs:/etc/agent-box/certs:ro
       # Home persistente isolata (tutta dentro la cartella del progetto):
       - ./agent-home:/home/agent:rw
+      # Canale FIFO audio unidirezionale per playback con microfono isolato:
+      - ./.runtime/audio:/run/agent-audio:rw
       # Script entrypoint, launcher GUI e gestore pacchetti rootless (sudo/apt) sempre allineati col repository:
       - ./agent/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
       - ./agent/agent-gui-launcher.sh:/usr/local/bin/agent-gui-launcher:ro

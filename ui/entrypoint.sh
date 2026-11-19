@@ -49,6 +49,22 @@ export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
 echo "[opensnitch-ui] Utente: $(id)"
 echo "[opensnitch-ui] QT_QPA_PLATFORM=${QT_QPA_PLATFORM}"
 echo "[opensnitch-ui] Finestra principale all'avvio: ${OPENSNITCH_SHOW_MAIN_WINDOW:-1}"
+
+# Bridge audio unidirezionale (solo playback, zero accesso al microfono per l'agente)
+if [ -d /run/agent-audio ] && command -v pacat >/dev/null 2>&1; then
+    (
+        HOST_PULSE_SOCK="/run/user/$(id -u)/pulse/native"
+        export PULSE_SERVER="unix:${HOST_PULSE_SOCK}"
+        while true; do
+            if [ -p /run/agent-audio/playback.fifo ] && [ -S "${HOST_PULSE_SOCK}" ]; then
+                pacat --playback --raw --format=s16le --rate=48000 --channels=2 --latency-msec=40 /run/agent-audio/playback.fifo 2>/dev/null || sleep 2
+            else
+                sleep 2
+            fi
+        done
+    ) &
+fi
+
 echo "[opensnitch-ui] Avvio interfaccia grafica su socket unix://${SOCKET_PATH} ..."
 
 exec /usr/bin/python3 /usr/local/bin/opensnitch-launcher.py --socket "unix://${SOCKET_PATH}"

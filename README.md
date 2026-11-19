@@ -116,5 +116,7 @@ Quando esci da un agente specifico (`claude`, `codex`, `opencode`, ecc.), **rima
 | `AGENT_EXTRA_VOLUMES` | *(vuoto)* | Volumi extra del progetto sul disco (`host:container[:ro\|rw]`, separati da `,` o `;`). Configurabile anche in `<cartella_progetto>/.agent-box.env`. |
 | `AGENT_GPU` | `auto` | Accesso iGPU (`/dev/dri`, `/dev/kfd`) e GPU NVIDIA (`auto`, `all`, `igpu`, `nvidia`, `none`). |
 | `AGENT_DISPLAY_MODE` | `auto` | Finestre grafiche Wayland / XWayland / X11 per agenti e app del progetto (`auto`, `wayland`, `xwayland`, `x11`, `none`). |
+| `AGENT_AUDIO` | `1` | Abilita l'uscita audio per l'agente e le applicazioni del progetto (`0` o `--no-audio` per disabilitare). |
+| `AGENT_MIC` | `0` | Microfono **disabilitato e isolato di default** (`0`). Imposta a `1` (o usa `--mic`) per abilitare l'ingresso microfono. |
 | `OPENSNITCH_SHOW_MAIN_WINDOW` | `1` | Apre di default la finestra principale di OpenSnitch all'avvio (`0` per lasciarla solo nella system tray). |
 | `OPENSNITCH_PROFILE` | *(vuoto)* | Profilo regole OpenSnitch da applicare all'avvio (`interattivo`, `disabilitato`, `solo-lan`, `solo-lan-ia`, `solo-internet`, `solo-provider-ia`, `solo-443-ipv4`). |

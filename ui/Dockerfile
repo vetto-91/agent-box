@@ -31,6 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libegl1 \
     dbus-x11 \
     xauth \
+    pulseaudio-utils \
+    alsa-utils \
     fonts-dejavu-core \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*

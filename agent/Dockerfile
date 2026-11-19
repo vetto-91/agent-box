@@ -163,7 +163,22 @@ RUN set -eux; \
         sh -s -- -y --default-toolchain stable --profile default --no-modify-path; \
     chmod -R a+rX /opt/rust
 
-LABEL agentbox.gui="2"
+# 4e. Supporto Audio (PulseAudio + ALSA plugin) con possibilità di playback isolato senza microfono
+RUN set -eux; \
+    if [ -f /etc/apt/sources.list.d/chatgpt.sources ]; then \
+        rm -f /etc/apt/sources.list.d/chatgpt.list; \
+    fi; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        pulseaudio \
+        pulseaudio-utils \
+        alsa-utils \
+        libasound2-plugins; \
+    setcap -r /usr/bin/pulseaudio 2>/dev/null || true; \
+    printf 'pcm.!default {\n    type pulse\n    fallback "sysdefault"\n}\nctl.!default {\n    type pulse\n    fallback "sysdefault"\n}\n' > /etc/asound.conf; \
+    rm -rf /var/lib/apt/lists/*
+
+LABEL agentbox.gui="3"
 
 # 5. Crea utente non-root "agent" con UID/GID corrispondenti all'utente host
 RUN (userdel -r ubuntu 2>/dev/null || true) && \

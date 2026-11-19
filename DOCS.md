@@ -73,6 +73,8 @@ Sintassi generale:
 | `--gpu <auto\|all\|igpu\|nvidia\|none>` | Configura l'accesso a iGPU (`/dev/dri`, `/dev/kfd`) e GPU NVIDIA (default: `auto`). |
 | `--display <auto\|wayland\|xwayland\|x11\|none>` | Abilita le finestre grafiche X11, XWayland e Wayland per gli agenti AI e le applicazioni del progetto (default: `auto`). |
 | `--no-gui` | Equivale a `--display none`. |
+| `--audio <on\|off\|1\|0>` / `--no-audio` | Abilita o disabilita l'uscita audio (default: `on`). |
+| `--mic [on\|off\|1\|0]` / `--no-mic` | Abilita o disabilita il microfono nel container (default: **disabilitato**, `0`). |
 | `--fw-profile <profilo>` | Attiva uno dei profili di regole OpenSnitch presenti in `./opensnitch-profiles` (`interattivo`, `disabilitato`, `solo-lan`, `solo-lan-ia`, `solo-internet`, `solo-provider-ia`, `solo-443-ipv4`). |
 
 Se `cartella_progetto` viene omessa (o il primo argomento non è una directory esistente, es. `./agent-box.sh claude --version`), viene montata automaticamente la cartella `./workspace`.
@@ -128,6 +130,8 @@ Ordine di priorità: **Opzioni CLI > `<cartella_progetto>/.agent-box.env` > vari
 | `AGENT_SHM_SIZE` | `512m` | Dimensione `/dev/shm` per `agent` (utile per applicazioni grafiche, browser ed Electron). |
 | `AGENT_GPU` | `auto` | Accesso GPU/iGPU: `auto` (rileva `/dev/dri`, `/dev/kfd` e runtime NVIDIA), `all`, `igpu`, `nvidia`, `none`. |
 | `AGENT_DISPLAY_MODE` | `auto` | Finestre grafiche per agenti AI e app del progetto: `auto` (Wayland + XWayland/X11), `wayland`, `xwayland`, `x11`, `none`. |
+| `AGENT_AUDIO` | `1` | `1` abilita l'uscita audio (altoparlanti/cuffie) tramite PulseAudio e ALSA; `0` disabilita tutto l'audio. |
+| `AGENT_MIC` | `0` | **Microfono disabilitato di default (`0`)**: il socket PulseAudio/PipeWire dell'host e i device di cattura ALSA (`/dev/snd/pcmC*D*c`) non vengono montati in `agent` (l'audio in uscita passa da un canale FIFO PCM unidirezionale). Imposta a `1` (o `--mic`) per abilitare il microfono. |
 | `OPENSNITCH_SHOW_MAIN_WINDOW` | `1` | `1` apre automaticamente la finestra principale di OpenSnitch all'avvio; `0` avvia OpenSnitch ridotto nella system tray. |
 | `OPENSNITCH_PROFILE` | *(vuoto)* | Profilo regole OpenSnitch preimpostato (`interattivo`, `disabilitato`, `solo-lan`, `solo-lan-ia`, `solo-internet`, `solo-provider-ia`, `solo-443-ipv4`). |
 
