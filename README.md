@@ -82,7 +82,9 @@ Quando esci da un agente specifico (`claude`, `codex`, `opencode`, ecc.), **rima
 
 # Cambiare o elencare i profili di regole OpenSnitch (importabili anche da GUI in /home/snitch/opensnitch-profiles):
 ./agent-box.sh fw-profile list
-./agent-box.sh fw-profile solo-lan
+# Installare pacchetti apt al volo dentro il container (senza privilegi root, salvati in ./agent-home/.local/sysroot):
+# (Puoi eseguire "sudo apt install ..." direttamente nella shell del container oppure dall'host:)
+./agent-box.sh apt install -y pkg-config libasound2-dev libudev-dev libx11-dev libxkbcommon-dev libwayland-dev
 ```
 
 ### 3. Modelli locali e HTTPS con certificato self-signed

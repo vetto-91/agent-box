@@ -185,15 +185,25 @@ ENV HOME=/home/agent \
     PIPX_BIN_DIR=/home/agent/.local/bin \
     CARGO_HOME=/home/agent/.cargo \
     RUSTUP_HOME=/opt/rust/rustup \
+    PKG_CONFIG_PATH=/home/agent/.local/sysroot/usr/lib/x86_64-linux-gnu/pkgconfig:/home/agent/.local/sysroot/usr/lib/aarch64-linux-gnu/pkgconfig:/home/agent/.local/sysroot/usr/lib/pkgconfig:/home/agent/.local/sysroot/usr/share/pkgconfig \
+    PKG_CONFIG_ALLOW_SYSTEM_LIBS=1 \
+    PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1 \
+    CPATH=/home/agent/.local/sysroot/usr/include/x86_64-linux-gnu:/home/agent/.local/sysroot/usr/include/aarch64-linux-gnu:/home/agent/.local/sysroot/usr/include \
+    LIBRARY_PATH=/home/agent/.local/sysroot/usr/lib/x86_64-linux-gnu:/home/agent/.local/sysroot/lib/x86_64-linux-gnu:/home/agent/.local/sysroot/usr/lib/aarch64-linux-gnu:/home/agent/.local/sysroot/lib/aarch64-linux-gnu:/home/agent/.local/sysroot/usr/lib \
+    LD_LIBRARY_PATH=/home/agent/.local/sysroot/usr/lib/x86_64-linux-gnu:/home/agent/.local/sysroot/lib/x86_64-linux-gnu:/home/agent/.local/sysroot/usr/lib/aarch64-linux-gnu:/home/agent/.local/sysroot/lib/aarch64-linux-gnu:/home/agent/.local/sysroot/usr/lib \
     SSL_CERT_FILE=/tmp/ca-certificates.crt \
     REQUESTS_CA_BUNDLE=/tmp/ca-certificates.crt \
     CURL_CA_BUNDLE=/tmp/ca-certificates.crt \
     NODE_EXTRA_CA_CERTS=/tmp/ca-certificates.crt \
-    PATH="/home/agent/.cargo/bin:/opt/rust/cargo/bin:/home/agent/.npm-global/bin:/home/agent/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    PATH="/home/agent/.local/sysroot/usr/bin:/home/agent/.local/sysroot/bin:/home/agent/.cargo/bin:/opt/rust/cargo/bin:/home/agent/.npm-global/bin:/home/agent/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY agent-gui-launcher.sh /usr/local/bin/agent-gui-launcher
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/agent-gui-launcher && \
+COPY agent-apt.sh /usr/local/bin/agent-apt
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/agent-gui-launcher /usr/local/bin/agent-apt && \
+    for cmd in sudo apt apt-get; do \
+        ln -sf /usr/local/bin/agent-apt "/usr/local/bin/${cmd}"; \
+    done && \
     for cmd in \
         claude-desktop claude-gui \
         chatgpt-desktop chatgpt-gui codex-desktop codex-gui \

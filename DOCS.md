@@ -101,6 +101,7 @@ Quando esci da un agente specifico (`claude`, `codex`, `grok`, `agy`, `pi`, `gem
 | `pi-desktop` / `pi-gui` | Avvia **Pi Coding Agent** in una finestra grafica Alacritty dedicata. |
 | `hermes-desktop` / `hermes-gui` | Avvia **Hermes Agent** in una finestra grafica Alacritty dedicata. |
 | `exec` | Esegue un comando arbitrario dentro il container `agent` (es. `./agent-box.sh exec /mio/progetto python3 script.py`). |
+| `apt` / `apt-get` | Installa pacchetti `.deb` al volo in modalità rootless nel sysroot persistente `/home/agent/.local/sysroot` (funziona anche eseguendo `sudo apt install ...` o `apt install ...` direttamente dentro la shell del container). |
 | `test-popup` / `popup` | Verifica il socket `osui.sock` ed esegue `curl -I https://example.com` dall'agente per far comparire il popup OpenSnitch. |
 | `test-isolation` / `audit` | Esegue l'audit di sicurezza dentro `agent` (UID non-root, `CapEff=0`, `NoNewPrivs=1`, rootfs `read_only`, socket invisibile, `kill` bloccato). |
 | `fw-profile [profilo\|list]` | Elenca o applica immediatamente un profilo di regole OpenSnitch da `./opensnitch-profiles` (riavviando `firewall` se già attivo). |

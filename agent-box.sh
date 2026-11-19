@@ -899,6 +899,10 @@ case "${CMD}" in
         start_stack "${TARGET}"
         dc exec agent "$@"
         ;;
+    apt|apt-get)
+        start_stack "${SCRIPT_DIR}/workspace"
+        dc exec agent agent-apt "$@"
+        ;;
     test-popup|popup)
         run_test_popup
         ;;
