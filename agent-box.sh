@@ -328,9 +328,9 @@ ensure_images_match_user() {
     agent_gui="$(docker inspect -f '{{index .Config.Labels "agentbox.gui"}}' agent-box-agent:local 2>/dev/null || true)"
     fw_base="$(docker inspect -f '{{index .Config.Labels "agentbox.base"}}' agent-box-firewall:local 2>/dev/null || true)"
 
-    if [ "${ui_uid}" != "${PUID}" ] || [ "${ui_base}" != "${expected_base}" ] || [ "${ui_ver}" != "4" ] || \
+    if [ "${ui_uid}" != "${PUID}" ] || [ "${ui_base}" != "${expected_base}" ] || [ "${ui_ver}" != "5" ] || \
        [ "${agent_uid}" != "${PUID}" ] || [ "${agent_base}" != "${expected_base}" ] || \
-       [ "${agent_gui}" != "5" ] || [ "${fw_base}" != "${expected_base}" ]; then
+       [ "${agent_gui}" != "6" ] || [ "${fw_base}" != "${expected_base}" ]; then
         echo "[agent-box] Build automatico immagini Ubuntu 26.04 per ${HOST_USER} (UID=${PUID}, GID=${PGID})..."
         docker compose -f "${SCRIPT_DIR}/docker-compose.yml" build \
             --build-arg PUID="${PUID}" \
@@ -534,10 +534,18 @@ generate_runtime_override() {
             if [ -S "${XDG_RUNTIME_DIR}/pulse/native" ]; then
                 echo "      - \"${XDG_RUNTIME_DIR}/pulse/native:/run/user/${PUID}/pulse/native:rw\""
             fi
-        elif [ -S "${XDG_RUNTIME_DIR}/pulse/native" ]; then
+            if [ -S "${XDG_RUNTIME_DIR}/bus" ]; then
+                echo "      - \"${XDG_RUNTIME_DIR}/bus:/run/user/${PUID}/bus:rw\""
+            fi
+        elif [ -S "${XDG_RUNTIME_DIR}/pulse/native" ] || [ -S "${XDG_RUNTIME_DIR}/bus" ]; then
             echo "  opensnitch-ui:"
             echo "    volumes:"
-            echo "      - \"${XDG_RUNTIME_DIR}/pulse/native:/run/user/${PUID}/pulse/native:rw\""
+            if [ -S "${XDG_RUNTIME_DIR}/pulse/native" ]; then
+                echo "      - \"${XDG_RUNTIME_DIR}/pulse/native:/run/user/${PUID}/pulse/native:rw\""
+            fi
+            if [ -S "${XDG_RUNTIME_DIR}/bus" ]; then
+                echo "      - \"${XDG_RUNTIME_DIR}/bus:/run/user/${PUID}/bus:rw\""
+            fi
         fi
 
         echo "  agent:"

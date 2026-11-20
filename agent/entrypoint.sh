@@ -239,6 +239,84 @@ EOF
             sleep 1
         done
     ) &
+    # Barra delle applicazioni (tint2) in basso per recuperare le finestre ridotte a icona (_)
+    if command -v tint2 >/dev/null 2>&1; then
+        cat <<'EOF' > /tmp/tint2rc
+#-------------------------------------
+# Backgrounds
+rounded = 0
+border_width = 0
+background_color = #181825 95
+border_color = #313244 100
+
+rounded = 4
+border_width = 1
+background_color = #313244 100
+border_color = #585b70 100
+
+rounded = 4
+border_width = 1
+background_color = #45475a 100
+border_color = #89b4fa 100
+
+rounded = 4
+border_width = 1
+background_color = #1e1e2e 85
+border_color = #45475a 80
+
+#-------------------------------------
+# Panel
+panel_items = TC
+panel_size = 100% 34
+panel_margin = 0 0
+panel_padding = 6 3 6
+panel_background_id = 1
+wm_menu = 1
+panel_dock = 0
+panel_position = bottom center horizontal
+panel_layer = top
+panel_monitor = all
+strut_policy = follow_size
+
+#-------------------------------------
+# Taskbar
+taskbar_mode = single_desktop
+taskbar_padding = 4 0 4
+taskbar_background_id = 0
+taskbar_active_background_id = 0
+task_icon = 1
+task_text = 1
+task_centered = 0
+task_maximum_size = 240 28
+task_padding = 8 4 6
+task_font = Sans 10
+task_font_color = #cdd6f4 100
+task_active_font_color = #ffffff 100
+task_iconified_font_color = #a6adc8 90
+task_background_id = 2
+task_active_background_id = 3
+task_iconified_background_id = 4
+mouse_left = toggle_iconify
+mouse_middle = close
+mouse_right = maximize_restore
+
+#-------------------------------------
+# Clock
+time1_format = %H:%M
+time1_font = Sans Bold 10
+clock_font_color = #cdd6f4 100
+clock_padding = 8 0
+clock_background_id = 0
+EOF
+        (
+            while true; do
+                if [ -S "/tmp/.X11-unix/X${DISPLAY#:}" ] && xdpyinfo -display "${DISPLAY}" >/dev/null 2>&1; then
+                    tint2 -c /tmp/tint2rc >/dev/null 2>&1 || true
+                fi
+                sleep 1
+            done
+        ) &
+    fi
     # Watcher RandR: quando ridimensioni o massimizzi la finestra Xephyr sull'host,
     # aggiorna automaticamente la risoluzione del monitor virtuale :99 per tutte le app al suo interno
     if command -v xrandr >/dev/null 2>&1; then

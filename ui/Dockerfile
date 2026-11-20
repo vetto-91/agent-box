@@ -6,13 +6,14 @@ ARG PGID=1000
 LABEL agentbox.uid="${PUID}" \
       agentbox.gid="${PGID}" \
       agentbox.base="ubuntu26.04" \
-      agentbox.version="4"
+      agentbox.version="5"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-opensnitch-ui \
     qtwayland5 \
+    qt5-gtk-platformtheme \
     libwayland-client0 \
     libwayland-cursor0 \
     libwayland-egl1 \
@@ -49,7 +50,8 @@ RUN (userdel -r ubuntu 2>/dev/null || true) && \
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY opensnitch-launcher.py /usr/local/bin/opensnitch-launcher.py
 COPY xephyr-fullscreen.py /usr/local/bin/xephyr-fullscreen.py
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/opensnitch-launcher.py /usr/local/bin/xephyr-fullscreen.py
+COPY xephyr-host.py /usr/local/bin/xephyr-host.py
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/opensnitch-launcher.py /usr/local/bin/xephyr-fullscreen.py /usr/local/bin/xephyr-host.py
 
 USER ${PUID}:${PGID}
 WORKDIR /home/snitch

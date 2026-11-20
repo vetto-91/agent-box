@@ -24,6 +24,7 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+      - apparmor:unconfined
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m
@@ -53,6 +54,7 @@ services:
       - ./ui/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
       - ./ui/opensnitch-launcher.py:/usr/local/bin/opensnitch-launcher.py:ro
       - ./ui/xephyr-fullscreen.py:/usr/local/bin/xephyr-fullscreen.py:ro
+      - ./ui/xephyr-host.py:/usr/local/bin/xephyr-host.py:ro
       - /tmp/.X11-unix:/tmp/.X11-unix:ro
       - ${XDG_RUNTIME_DIR:-/run/user/1000}:/run/user/${PUID:-1000}:ro
     pids_limit: 512

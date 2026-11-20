@@ -100,54 +100,30 @@ EOF
     fi
 fi
 
-# Server X11 annidato e isolato (Xephyr :99) per il container agent:
+# Server X11 annidato e isolato (Xephyr :99) avvolto in QMainWindow (xephyr-host.py):
+# - Conferma alla chiusura ("Sì, chiudi" / "Annulla") per evitare la chiusura accidentale delle app grafiche
+# - Toggle schermo intero (F11 / ./agent-box.sh fullscreen) e ridimensionamento dinamico RandR
 # - Impedisce agli agenti di fare screenshot degli schermi host, keylogging o cliccare sui popup OpenSnitch
-# - Permette ad agent di usare xdotool (mouse/tastiera) e xrandr dentro il monitor virtuale :99
 if [ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ] && command -v Xephyr >/dev/null 2>&1; then
     XEPHYR_DISPLAY="${AGENT_XEPHYR_DISPLAY:-:99}"
     XEPHYR_SCREEN="${AGENT_SCREEN_SIZE:-1600x900}"
     XEPHYR_FS="${AGENT_FULLSCREEN:-0}"
     echo "[opensnitch-ui] Avvio monitor virtuale isolato Xephyr ${XEPHYR_DISPLAY} (${XEPHYR_SCREEN}, fullscreen=${XEPHYR_FS})..."
-    rm -f "/tmp/.X11-unix/X${XEPHYR_DISPLAY#:}" "/tmp/.X${XEPHYR_DISPLAY#:}-lock" 2>/dev/null || true
-    (
-        while true; do
-            if [ "${XEPHYR_FS}" = "1" ]; then
-                Xephyr "${XEPHYR_DISPLAY}" \
-                    -fullscreen \
-                    -host-cursor \
-                    -ac \
-                    -nolisten tcp \
-                    +extension RANDR \
-                    +extension GLX \
-                    +extension RENDER \
-                    -title "Agent-Box Virtual Monitor (${XEPHYR_DISPLAY})" \
-                    2>&1 || true
-            else
-                Xephyr "${XEPHYR_DISPLAY}" \
-                    -screen "${XEPHYR_SCREEN}" \
-                    -resizeable \
-                    -host-cursor \
-                    -ac \
-                    -nolisten tcp \
-                    +extension RANDR \
-                    +extension GLX \
-                    +extension RENDER \
-                    -title "Agent-Box Virtual Monitor (${XEPHYR_DISPLAY})" \
-                    2>&1 || true
-            fi
-            sleep 2
-        done
-    ) &
-    # Watcher per il toggle schermo intero (F11 dentro Xephyr o ./agent-box.sh fullscreen)
-    if [ -x /usr/local/bin/xephyr-fullscreen.py ] && [ -d /run/agent-audio ]; then
-        rm -f /run/agent-audio/toggle-fullscreen 2>/dev/null || true
+    rm -f "/tmp/.X11-unix/X${XEPHYR_DISPLAY#:}" "/tmp/.X${XEPHYR_DISPLAY#:}-lock" /run/agent-audio/toggle-fullscreen 2>/dev/null || true
+    if [ -x /usr/local/bin/xephyr-host.py ]; then
+        (
+            export QT_QPA_PLATFORM=xcb
+            export AGENT_XEPHYR_DISPLAY="${XEPHYR_DISPLAY}"
+            export AGENT_SCREEN_SIZE="${XEPHYR_SCREEN}"
+            export AGENT_FULLSCREEN="${XEPHYR_FS}"
+            /usr/bin/python3 /usr/local/bin/xephyr-host.py 2>&1 || true
+        ) &
+    else
         (
             while true; do
-                if [ -f /run/agent-audio/toggle-fullscreen ]; then
-                    rm -f /run/agent-audio/toggle-fullscreen 2>/dev/null || true
-                    /usr/bin/python3 /usr/local/bin/xephyr-fullscreen.py 2>/dev/null || true
-                fi
-                sleep 0.3
+                Xephyr "${XEPHYR_DISPLAY}" -screen "${XEPHYR_SCREEN}" -resizeable -host-cursor -ac -nolisten tcp \
+                    +extension RANDR +extension GLX +extension RENDER -title "Agent-Box Virtual Monitor (${XEPHYR_DISPLAY})" 2>&1 || true
+                sleep 2
             done
         ) &
     fi
@@ -155,4 +131,5 @@ fi
 
 echo "[opensnitch-ui] Avvio interfaccia grafica su socket unix://${SOCKET_PATH} ..."
 
-exec /usr/bin/python3 /usr/local/bin/opensnitch-launcher.py --socket "unix://${SOCKET_PATH}"
+# Non usare exec: evita PID 1 per non collidere su D-Bus org.kde.StatusNotifierItem-1-1 nella tray bar dell'host
+/usr/bin/python3 /usr/local/bin/opensnitch-launcher.py --socket "unix://${SOCKET_PATH}"
