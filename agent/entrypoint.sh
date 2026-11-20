@@ -27,6 +27,7 @@ if ! mkdir -p \
     "${HOME}/.local/bin" \
     "${HOME}/.cache/npm" \
     "${HOME}/.cache/uv" \
+    "${HOME}/.cache/tmp" \
     "${HOME}/.config/opencode" \
     "${HOME}/.pi/agent" \
     "${HOME}/.codex" \

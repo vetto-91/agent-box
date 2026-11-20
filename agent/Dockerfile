@@ -69,14 +69,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
 
 # 3. Pre-installa CLI degli agenti AI globalmente in /usr/local
-#    (Claude Code, OpenCode, OpenAI Codex/ChatGPT, xAI Grok, Gemini CLI, Pi Agent)
+#    (Claude Code, OpenAI Codex/ChatGPT, xAI Grok, Gemini CLI; OpenCode, Pi e Hermes usano gli installer ufficiali curl in $HOME)
 RUN npm install -g \
     @anthropic-ai/claude-code \
-    opencode-ai \
     @openai/codex \
     @xai-official/grok \
     @google/gemini-cli \
-    @mariozechner/pi-coding-agent \
     && npm cache clean --force
 
 # 3b. Installa Antigravity CLI (agy) se raggiungibile al build, altrimenti wrapper lazy al primo avvio
@@ -99,13 +97,12 @@ RUN if [ "${INSTALL_AIDER_AT_BUILD}" = "1" ]; then \
         chmod +x /usr/local/bin/aider; \
     fi
 
-# 4b. Wrapper intelligente per Hermes Agent (Nous Research)
-RUN if [ "${INSTALL_HERMES_AT_BUILD}" = "1" ]; then \
-        PIPX_HOME=/opt/pipx-hermes PIPX_BIN_DIR=/usr/local/bin pipx install hermes-agent; \
-    else \
-        printf '#!/bin/sh\nset -e\nif [ ! -x "$HOME/.local/bin/hermes" ]; then\n  echo "[agent-box] Prima esecuzione di Hermes Agent: installazione in $HOME/.local tramite uv..."\n  uv tool install --python python3 hermes-agent\nfi\nexec "$HOME/.local/bin/hermes" "$@"\n' > /usr/local/bin/hermes && \
-        chmod +x /usr/local/bin/hermes; \
-    fi
+# 4b. Wrapper per Hermes Agent, OpenCode e Pi Agent (installati tramite script curl ufficiali in $HOME)
+COPY agent-tools-wrapper.sh /usr/local/bin/agent-tools-wrapper
+RUN chmod +x /usr/local/bin/agent-tools-wrapper && \
+    ln -sf /usr/local/bin/agent-tools-wrapper /usr/local/bin/opencode && \
+    ln -sf /usr/local/bin/agent-tools-wrapper /usr/local/bin/pi && \
+    ln -sf /usr/local/bin/agent-tools-wrapper /usr/local/bin/hermes
 
 # 4c. Versioni GUI / Desktop degli agenti AI (Claude Desktop, ChatGPT/Codex App,
 #     OpenCode Desktop, Google Chrome App-Mode per Grok/Gemini/Aider GUI, Alacritty)
@@ -215,7 +212,7 @@ ENV HOME=/home/agent \
     REQUESTS_CA_BUNDLE=/tmp/ca-certificates.crt \
     CURL_CA_BUNDLE=/tmp/ca-certificates.crt \
     NODE_EXTRA_CA_CERTS=/tmp/ca-certificates.crt \
-    PATH="/home/agent/.local/sysroot/usr/bin:/home/agent/.local/sysroot/bin:/home/agent/.cargo/bin:/opt/rust/cargo/bin:/home/agent/.npm-global/bin:/home/agent/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    PATH="/home/agent/.pi/bin:/home/agent/.hermes/bin:/home/agent/.local/sysroot/usr/bin:/home/agent/.local/sysroot/bin:/home/agent/.cargo/bin:/opt/rust/cargo/bin:/home/agent/.npm-global/bin:/home/agent/.local/bin:/usr/local/sbin:/usr/local/bin:/home/agent/.opencode/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY agent-gui-launcher.sh /usr/local/bin/agent-gui-launcher

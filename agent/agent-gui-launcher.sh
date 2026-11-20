@@ -133,7 +133,7 @@ case "${APP_NAME}" in
         launch_terminal_gui "Pi Coding Agent" pi "$@"
         ;;
     hermes-desktop|hermes-gui)
-        launch_terminal_gui "Hermes Agent" hermes "$@"
+        exec hermes desktop "$@"
         ;;
     agent-webapp-open)
         launch_webapp "webapp" "AgentBoxWebApp" "${1:-http://127.0.0.1:8501}"

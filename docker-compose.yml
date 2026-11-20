@@ -148,7 +148,7 @@ services:
       - HOME=/home/agent
       - USER=agent
       - TERM=${TERM:-xterm-256color}
-      - PATH=/home/agent/.local/sysroot/usr/bin:/home/agent/.local/sysroot/bin:/home/agent/.cargo/bin:/opt/rust/cargo/bin:/home/agent/.npm-global/bin:/home/agent/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - PATH=/home/agent/.pi/bin:/home/agent/.hermes/bin:/home/agent/.local/sysroot/usr/bin:/home/agent/.local/sysroot/bin:/home/agent/.cargo/bin:/opt/rust/cargo/bin:/home/agent/.npm-global/bin:/home/agent/.local/bin:/usr/local/sbin:/usr/local/bin:/home/agent/.opencode/bin:/usr/sbin:/usr/bin:/sbin:/bin
       - PKG_CONFIG_PATH=/home/agent/.local/sysroot/usr/lib/x86_64-linux-gnu/pkgconfig:/home/agent/.local/sysroot/usr/lib/aarch64-linux-gnu/pkgconfig:/home/agent/.local/sysroot/usr/lib/pkgconfig:/home/agent/.local/sysroot/usr/share/pkgconfig
       - PKG_CONFIG_ALLOW_SYSTEM_LIBS=1
       - PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1
@@ -187,6 +187,9 @@ services:
       - ./agent/agent-apt.sh:/usr/local/bin/sudo:ro
       - ./agent/agent-apt.sh:/usr/local/bin/apt:ro
       - ./agent/agent-apt.sh:/usr/local/bin/apt-get:ro
+      - ./agent/agent-tools-wrapper.sh:/usr/local/bin/opencode:ro
+      - ./agent/agent-tools-wrapper.sh:/usr/local/bin/pi:ro
+      - ./agent/agent-tools-wrapper.sh:/usr/local/bin/hermes:ro
     pids_limit: ${AGENT_PIDS_LIMIT:-4096}
     mem_limit: ${AGENT_MEM_LIMIT:-8g}
     cpus: ${AGENT_CPUS:-0}
