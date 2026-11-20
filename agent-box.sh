@@ -447,7 +447,12 @@ generate_runtime_override() {
 
     if ( [ -e /dev/nvidia0 ] || command -v nvidia-smi >/dev/null 2>&1 ) && \
        docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q 'nvidia'; then
-        has_nvidia_runtime=1
+        if ! command -v nvidia-smi >/dev/null 2>&1 || nvidia-smi >/dev/null 2>&1; then
+            has_nvidia_runtime=1
+        else
+            echo "[agent-box] ATTENZIONE: GPU NVIDIA rilevata ma 'nvidia-smi' fallisce (probabile aggiornamento driver in attesa di riavvio del PC)." >&2
+            echo "[agent-box] Fallback automatico su iGPU/CPU. Riavvia il PC per riattivare la GPU NVIDIA." >&2
+        fi
     fi
 
     case "${gpu_mode}" in
