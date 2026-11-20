@@ -55,8 +55,8 @@ services:
       - ./ui/xephyr-fullscreen.py:/usr/local/bin/xephyr-fullscreen.py:ro
       - /tmp/.X11-unix:/tmp/.X11-unix:ro
       - ${XDG_RUNTIME_DIR:-/run/user/1000}:/run/user/${PUID:-1000}:ro
-    pids_limit: 128
-    mem_limit: 512m
+    pids_limit: 512
+    mem_limit: 1g
     restart: unless-stopped
 
   # ============================================================================
@@ -100,8 +100,8 @@ services:
       - ./opensnitch/rules:/etc/opensnitchd/rules:rw
     networks:
       - agent_net
-    pids_limit: 128
-    mem_limit: 512m
+    pids_limit: 512
+    mem_limit: 1g
     restart: unless-stopped
 
   # ============================================================================
@@ -185,7 +185,7 @@ services:
       - ./agent/agent-apt.sh:/usr/local/bin/sudo:ro
       - ./agent/agent-apt.sh:/usr/local/bin/apt:ro
       - ./agent/agent-apt.sh:/usr/local/bin/apt-get:ro
-    pids_limit: 512
+    pids_limit: ${AGENT_PIDS_LIMIT:-4096}
     mem_limit: ${AGENT_MEM_LIMIT:-8g}
     cpus: ${AGENT_CPUS:-0}
 
