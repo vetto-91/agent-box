@@ -197,7 +197,8 @@ if [ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ] && [ -n "${DISPLAY:-}" ] && command -v
     <keybind key="A-Tab"><action name="NextWindow"/></keybind>
     <keybind key="A-F4"><action name="Close"/></keybind>
     <keybind key="A-F10"><action name="ToggleMaximize"/></keybind>
-    <keybind key="F11"><action name="ToggleFullscreen"/></keybind>
+    <keybind key="F11"><action name="Execute"><command>sh -c 'touch /run/agent-audio/toggle-fullscreen'</command></action></keybind>
+    <keybind key="A-F11"><action name="ToggleFullscreen"/></keybind>
   </keyboard>
   <mouse>
     <context name="Frame">

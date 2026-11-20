@@ -1107,6 +1107,11 @@ case "${CMD}" in
         start_stack "${SCRIPT_DIR}/workspace"
         dc exec agent agent-apt "$@"
         ;;
+    fullscreen)
+        mkdir -p "${RUNTIME_DIR}/audio"
+        touch "${RUNTIME_DIR}/audio/toggle-fullscreen"
+        echo "[agent-box] Toggle schermo intero inviato a Agent-Box Virtual Monitor (:99)."
+        ;;
     test-popup|popup)
         run_test_popup
         ;;

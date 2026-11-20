@@ -138,6 +138,19 @@ if [ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ] && command -v Xephyr >/dev/null 2>&1; 
             sleep 2
         done
     ) &
+    # Watcher per il toggle schermo intero (F11 dentro Xephyr o ./agent-box.sh fullscreen)
+    if [ -x /usr/local/bin/xephyr-fullscreen.py ] && [ -d /run/agent-audio ]; then
+        rm -f /run/agent-audio/toggle-fullscreen 2>/dev/null || true
+        (
+            while true; do
+                if [ -f /run/agent-audio/toggle-fullscreen ]; then
+                    rm -f /run/agent-audio/toggle-fullscreen 2>/dev/null || true
+                    /usr/bin/python3 /usr/local/bin/xephyr-fullscreen.py 2>/dev/null || true
+                fi
+                sleep 0.3
+            done
+        ) &
+    fi
 fi
 
 echo "[opensnitch-ui] Avvio interfaccia grafica su socket unix://${SOCKET_PATH} ..."

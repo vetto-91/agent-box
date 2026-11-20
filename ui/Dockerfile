@@ -48,7 +48,8 @@ RUN (userdel -r ubuntu 2>/dev/null || true) && \
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY opensnitch-launcher.py /usr/local/bin/opensnitch-launcher.py
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/opensnitch-launcher.py
+COPY xephyr-fullscreen.py /usr/local/bin/xephyr-fullscreen.py
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/opensnitch-launcher.py /usr/local/bin/xephyr-fullscreen.py
 
 USER ${PUID}:${PGID}
 WORKDIR /home/snitch

@@ -1,6 +1,8 @@
 # Configurazione locale e segreti
 .env
 .agent-box.env
+__pycache__/
+*.pyc
 
 # Directory e file generati a runtime da agent-box.sh
 .runtime/
