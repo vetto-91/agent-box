@@ -12,6 +12,32 @@ if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && command -v dbus-run-session >/dev/n
     exec dbus-run-session -- "$0" "$@"
 fi
 
+# Se il monitor virtuale isolato (Xephyr :99) era stato chiuso dall'utente, lo ricrea automaticamente on-demand
+ensure_virtual_display() {
+    if [ "${AGENT_XEPHYR_ENABLED:-0}" != "1" ] || [ -z "${DISPLAY:-}" ]; then
+        return 0
+    fi
+    if command -v xdpyinfo >/dev/null 2>&1 && xdpyinfo -display "${DISPLAY}" >/dev/null 2>&1; then
+        return 0
+    fi
+    if [ -d /run/agent-audio ]; then
+        echo "[agent-box] Monitor virtuale (${DISPLAY}) chiuso: riavvio automatico in corso..."
+        touch /run/agent-audio/start-xephyr 2>/dev/null || true
+        local waited=0
+        while [ "${waited}" -lt 30 ]; do
+            if [ -S "/tmp/.X11-unix/X${DISPLAY#:}" ] && command -v xdpyinfo >/dev/null 2>&1 && xdpyinfo -display "${DISPLAY}" >/dev/null 2>&1; then
+                # Attende un attimo che openbox/tint2 si riaggancino al nuovo Xephyr
+                sleep 0.8
+                return 0
+            fi
+            sleep 0.5
+            waited=$((waited + 1))
+        done
+        echo "[agent-box] ATTENZIONE: il monitor virtuale (${DISPLAY}) non ha risposto entro 15s." >&2
+    fi
+}
+ensure_virtual_display
+
 # Inizializza e sblocca GNOME Keyring (Secret Service API) per Claude Desktop e altre app Electron
 if command -v gnome-keyring-daemon >/dev/null 2>&1; then
     mkdir -p "${HOME}/.local/share/keyrings" "${HOME}/.cache"

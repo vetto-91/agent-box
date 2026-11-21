@@ -109,14 +109,24 @@ if [ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ] && command -v Xephyr >/dev/null 2>&1; 
     XEPHYR_SCREEN="${AGENT_SCREEN_SIZE:-1600x900}"
     XEPHYR_FS="${AGENT_FULLSCREEN:-0}"
     echo "[opensnitch-ui] Avvio monitor virtuale isolato Xephyr ${XEPHYR_DISPLAY} (${XEPHYR_SCREEN}, fullscreen=${XEPHYR_FS})..."
-    rm -f "/tmp/.X11-unix/X${XEPHYR_DISPLAY#:}" "/tmp/.X${XEPHYR_DISPLAY#:}-lock" /run/agent-audio/toggle-fullscreen 2>/dev/null || true
+    rm -f "/tmp/.X11-unix/X${XEPHYR_DISPLAY#:}" "/tmp/.X${XEPHYR_DISPLAY#:}-lock" /run/agent-audio/toggle-fullscreen /run/agent-audio/start-xephyr 2>/dev/null || true
     if [ -x /usr/local/bin/xephyr-host.py ]; then
         (
             export QT_QPA_PLATFORM=xcb
             export AGENT_XEPHYR_DISPLAY="${XEPHYR_DISPLAY}"
             export AGENT_SCREEN_SIZE="${XEPHYR_SCREEN}"
             export AGENT_FULLSCREEN="${XEPHYR_FS}"
-            /usr/bin/python3 /usr/local/bin/xephyr-host.py 2>&1 || true
+            FIRST_START=1
+            while true; do
+                if [ "${FIRST_START}" -eq 1 ] || [ -f /run/agent-audio/start-xephyr ]; then
+                    FIRST_START=0
+                    rm -f /run/agent-audio/start-xephyr 2>/dev/null || true
+                    /usr/bin/python3 /usr/local/bin/xephyr-host.py 2>&1 || true
+                    rm -f "/tmp/.X11-unix/X${XEPHYR_DISPLAY#:}" "/tmp/.X${XEPHYR_DISPLAY#:}-lock" 2>/dev/null || true
+                    echo "[opensnitch-ui] Monitor virtuale ${XEPHYR_DISPLAY} chiuso. In attesa di richiesta di riavvio da un'app grafica..."
+                fi
+                sleep 0.5
+            done
         ) &
     else
         (

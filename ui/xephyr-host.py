@@ -193,6 +193,12 @@ class XephyrHostWindow(QtWidgets.QMainWindow):
                     self.xephyr_proc.kill()
                 except Exception:
                     pass
+        disp_num = self.xephyr_display.lstrip(":")
+        for f in (f"/tmp/.X11-unix/X{disp_num}", f"/tmp/.X{disp_num}-lock"):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
 
 
 def main():
