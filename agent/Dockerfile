@@ -196,6 +196,8 @@ RUN (userdel -r ubuntu 2>/dev/null || true) && \
 # Variabili d'ambiente per permettere installazioni utente anche con rootfs read-only
 ENV HOME=/home/agent \
     USER=agent \
+    TMPDIR=/home/agent/.cache/tmp \
+    BUN_TMPDIR=/home/agent/.cache/tmp \
     NPM_CONFIG_PREFIX=/home/agent/.npm-global \
     NPM_CONFIG_CACHE=/home/agent/.cache/npm \
     UV_CACHE_DIR=/home/agent/.cache/uv \

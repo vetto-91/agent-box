@@ -115,21 +115,31 @@ case "${APP_NAME}" in
         ;;
     opencode-desktop|opencode-gui)
         for oc_bin in \
+            /opt/OpenCode/ai.opencode \
             /opt/OpenCode/ai.opencode.desktop \
             /opt/OpenCode/opencode-desktop \
             /opt/OpenCode/opencode \
+            /usr/bin/ai.opencode \
             /usr/bin/ai.opencode.desktop \
             /usr/bin/opencode-desktop; do
             if [ -x "${oc_bin}" ]; then
                 exec "${oc_bin}" "${COMMON_ELECTRON_FLAGS[@]}" "$@"
             fi
         done
-        export BROWSER="/usr/local/bin/agent-webapp-open"
-        exec opencode web "$@"
+        launch_terminal_gui "OpenCode" opencode "$@"
         ;;
     opencode-web)
-        export BROWSER="/usr/local/bin/agent-webapp-open"
-        exec opencode web "$@"
+        if opencode --help 2>&1 | grep -Eq '^[[:space:]]+web([[:space:]]|$)'; then
+            export BROWSER="/usr/local/bin/agent-webapp-open"
+            exec opencode web "$@"
+        fi
+        # OpenCode v2 non ha più il sottocomando "web": apre l'app desktop nativa (o TUI in finestra)
+        for oc_bin in /opt/OpenCode/ai.opencode /opt/OpenCode/ai.opencode.desktop; do
+            if [ -x "${oc_bin}" ]; then
+                exec "${oc_bin}" "${COMMON_ELECTRON_FLAGS[@]}" "$@"
+            fi
+        done
+        launch_terminal_gui "OpenCode" opencode "$@"
         ;;
     aider-desktop|aider-gui)
         export BROWSER="/usr/local/bin/agent-webapp-open"

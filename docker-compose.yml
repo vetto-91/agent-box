@@ -155,6 +155,8 @@ services:
     environment:
       - HOME=/home/agent
       - USER=agent
+      - TMPDIR=/home/agent/.cache/tmp
+      - BUN_TMPDIR=/home/agent/.cache/tmp
       - TERM=${TERM:-xterm-256color}
       - PATH=/home/agent/.pi/bin:/home/agent/.hermes/bin:/home/agent/.local/sysroot/usr/bin:/home/agent/.local/sysroot/bin:/home/agent/.cargo/bin:/opt/rust/cargo/bin:/home/agent/.npm-global/bin:/home/agent/.local/bin:/usr/local/sbin:/usr/local/bin:/home/agent/.opencode/bin:/usr/sbin:/usr/bin:/sbin:/bin
       - PKG_CONFIG_PATH=/home/agent/.local/sysroot/usr/lib/x86_64-linux-gnu/pkgconfig:/home/agent/.local/sysroot/usr/lib/aarch64-linux-gnu/pkgconfig:/home/agent/.local/sysroot/usr/lib/pkgconfig:/home/agent/.local/sysroot/usr/share/pkgconfig
