@@ -793,9 +793,26 @@ start_stack() {
     proj_fw_profile="$(read_env_var "${project_env}" "OPENSNITCH_PROFILE")"
     [ -n "${proj_fw_profile}" ] && fw_profile="${proj_fw_profile}"
     [ -n "${CLI_FW_PROFILE}" ] && fw_profile="${CLI_FW_PROFILE}"
+    local fw_profile_applied=0
     if [ -n "${fw_profile}" ]; then
         apply_opensnitch_profile "${fw_profile}"
+        fw_profile_applied=1
     fi
+
+    # Esporta le impostazioni di rete da .env e <progetto>/.agent-box.env
+    # (priorità: shell env > .agent-box.env > .env) così firewall e agent sono sempre allineati
+    local net_var net_val proj_net_val
+    for net_var in AUTO_DNS AUTO_ALLOW_ENV_ENDPOINTS AUTO_ALLOW_OLLAMA OLLAMA_HOST OLLAMA_API_BASE OLLAMA_PORT LOCAL_LLM_BASE_URL OPENAI_BASE_URL; do
+        net_val="${!net_var:-}"
+        if [ -z "${net_val}" ]; then
+            net_val="$(read_env_var "${SCRIPT_DIR}/.env" "${net_var}")"
+            proj_net_val="$(read_env_var "${project_env}" "${net_var}")"
+            [ -n "${proj_net_val}" ] && net_val="${proj_net_val}"
+        fi
+        if [ -n "${net_val}" ]; then
+            export "${net_var}=${net_val}"
+        fi
+    done
 
     # Volumi extra (.env + .agent-box.env + CLI -v)
     local raw_vols=""
@@ -841,7 +858,18 @@ start_stack() {
         echo "[agent-box] Volumi extra    : ${all_extra_vols[*]}"
     fi
 
+    local fw_was_running=0
+    if [ "$(docker inspect -f '{{.State.Status}}' agent-box-firewall 2>/dev/null || true)" = "running" ]; then
+        fw_was_running=1
+    fi
+
     dc up -d opensnitch-ui firewall agent
+
+    # Se è stato appena applicato un profilo firewall mentre il container era già attivo,
+    # riavvia firewall così entrypoint.sh rigenera subito le regole prioritarie da .env (010..013-*)
+    if [ "${fw_profile_applied}" -eq 1 ] && [ "${fw_was_running}" -eq 1 ]; then
+        dc restart firewall >/dev/null
+    fi
 
     # Verifica rapida che i container critici non siano andati subito in crash
     sleep 1

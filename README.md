@@ -110,8 +110,9 @@ Quando esci da un agente specifico (`claude`, `codex`, `opencode`, ecc.), **rima
 | Variabile | Default | Descrizione |
 | :--- | :--- | :--- |
 | `AUTO_DNS` | `1` | Se `1`, consente automaticamente le query DNS (porta 53) evitando il doppio popup in OpenSnitch (il traffico HTTP/HTTPS/TCP effettivo richiede sempre approvazione). Imposta a `0` per approvare anche ogni singola query DNS. |
-| `AUTO_ALLOW_OLLAMA` | `0` | Se `1`, pre-autorizza il traffico verso la porta `11434` (Ollama) senza popup. Se `0`, anche le chiamate a Ollama vengono mostrate da OpenSnitch UI. |
-| `OLLAMA_HOST` | `http://host.docker.internal:11434` | Indirizzo del server Ollama (sull'host o nel container opzionale). |
+| `AUTO_ALLOW_ENV_ENDPOINTS` | `1` | Se `1`, genera automaticamente regole OpenSnitch ad-hoc ad alta priorità (`010..013-allow-env-*`, `precedence: true`) limitate **esclusivamente** a IP/host e porta degli endpoint di rete configurati in `.env` (`OLLAMA_HOST`, `OLLAMA_API_BASE`, `LOCAL_LLM_BASE_URL`, `OPENAI_BASE_URL`), prioritarie anche sui profili restrittivi (es. `solo-internet`, `solo-provider-ia`, `solo-443-ipv4`). |
+| `AUTO_ALLOW_OLLAMA` | `1` | Se `1`, crea la regola prioritaria ad-hoc (IP/host + porta esatta) per `OLLAMA_HOST`. Se `0`, richiede conferma per il default `host.docker.internal:11434` (un `OLLAMA_HOST` personalizzato resta comunque prioritario). |
+| `OLLAMA_HOST` | `http://host.docker.internal:11434` | Indirizzo del server Ollama (host, LAN o container opzionale). Genera la regola prioritaria `010-allow-env-ollama-*` per il solo IP/host e porta configurati. |
 | `AGENT_CPUS` | *(tutti)* | Core CPU assegnati al container `agent` (vuoto, `0` o `all` = tutti i core dell'host). |
 | `AGENT_EXTRA_VOLUMES` | *(vuoto)* | Volumi extra del progetto sul disco (`host:container[:ro\|rw]`, separati da `,` o `;`). Configurabile anche in `<cartella_progetto>/.agent-box.env`. |
 | `AGENT_GPU` | `auto` | Accesso iGPU (`/dev/dri`, `/dev/kfd`) e GPU NVIDIA (`auto`, `all`, `igpu`, `nvidia`, `none`). |

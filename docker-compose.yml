@@ -93,13 +93,20 @@ services:
       - /run/lock:rw,noexec,nosuid,nodev,size=16m
     environment:
       - AUTO_DNS=${AUTO_DNS:-1}
-      - AUTO_ALLOW_OLLAMA=${AUTO_ALLOW_OLLAMA:-0}
+      - AUTO_ALLOW_ENV_ENDPOINTS=${AUTO_ALLOW_ENV_ENDPOINTS:-1}
+      - AUTO_ALLOW_OLLAMA=${AUTO_ALLOW_OLLAMA:-1}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://host.docker.internal:11434}
       - OLLAMA_PORT=${OLLAMA_PORT:-11434}
+      - LOCAL_LLM_BASE_URL=${LOCAL_LLM_BASE_URL:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./opensnitch/socket:/run/opensnitch:rw
       - ./opensnitch/rules:/etc/opensnitchd/rules:rw
+      - ./firewall/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+      - ./hosts:/etc/agent-box/hosts:ro
     networks:
       - agent_net
     pids_limit: 512
