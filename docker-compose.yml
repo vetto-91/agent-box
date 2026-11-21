@@ -97,6 +97,7 @@ services:
       - AUTO_ALLOW_OLLAMA=${AUTO_ALLOW_OLLAMA:-1}
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://host.docker.internal:11434}
+      - OLLAMA_HOSTS=${OLLAMA_HOSTS:-}
       - OLLAMA_PORT=${OLLAMA_PORT:-11434}
       - LOCAL_LLM_BASE_URL=${LOCAL_LLM_BASE_URL:-}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
@@ -164,6 +165,7 @@ services:
       - LD_LIBRARY_PATH=/home/agent/.local/sysroot/usr/lib/x86_64-linux-gnu:/home/agent/.local/sysroot/lib/x86_64-linux-gnu:/home/agent/.local/sysroot/usr/lib/aarch64-linux-gnu:/home/agent/.local/sysroot/lib/aarch64-linux-gnu:/home/agent/.local/sysroot/usr/lib
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://host.docker.internal:11434}
+      - OLLAMA_HOSTS=${OLLAMA_HOSTS:-}
       - LOCAL_LLM_BASE_URL=${LOCAL_LLM_BASE_URL:-}
       - LOCAL_LLM_API_KEY=${LOCAL_LLM_API_KEY:-local}
       - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-qwen2.5-coder:latest}

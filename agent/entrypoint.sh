@@ -77,22 +77,35 @@ LOCAL_NAME="${LOCAL_LLM_NAME:-Local LLM}"
 
 # 4a. OpenCode (~/.config/opencode/opencode.json)
 if [ ! -f "${HOME}/.config/opencode/opencode.json" ] || [ "${AGENT_REGENERATE_LOCAL_CONFIG:-0}" = "1" ]; then
-    if [ -n "${OLLAMA_HOST:-}" ] || [ -n "${LOCAL_URL}" ]; then
+    if [ -n "${OLLAMA_HOST:-}" ] || [ -n "${OLLAMA_HOSTS:-}" ] || [ -n "${LOCAL_URL}" ]; then
         jq -n \
             --arg ollama_url "${OLLAMA_HOST:-}" \
+            --arg ollama_hosts "${OLLAMA_HOSTS:-}" \
             --arg local_url "${LOCAL_URL}" \
             --arg local_key "${LOCAL_KEY}" \
             --arg local_model "${LOCAL_MODEL}" \
             --arg local_name "${LOCAL_NAME}" '
+            def clean_url: gsub("^\\s+|\\s+$"; "") | sub("/+$"; "");
+            def extra_list:
+                ($ollama_hosts | gsub(";"; ",") | split(",") | map(clean_url) | map(select(length > 0)))
+                | map(select(. != ($ollama_url | clean_url)));
             {"$schema": "https://opencode.ai/config.json", "provider": {}}
-            | if $ollama_url != "" then
+            | if ($ollama_url | clean_url) != "" then
                 .provider.ollama = {
                     "npm": "@ai-sdk/openai-compatible",
                     "name": "Ollama (Local)",
-                    "options": {"baseURL": ($ollama_url + "/v1")},
+                    "options": {"baseURL": (($ollama_url | clean_url) + "/v1")},
                     "models": {}
                 }
               else . end
+            | reduce (extra_list | to_entries[]) as $item (.;
+                .provider["ollama-\($item.key + 2)"] = {
+                    "npm": "@ai-sdk/openai-compatible",
+                    "name": "Ollama #\($item.key + 2) (\($item.value))",
+                    "options": {"baseURL": ($item.value + "/v1")},
+                    "models": {}
+                }
+              )
             | if $local_url != "" then
                 .provider.local = {
                     "npm": "@ai-sdk/openai-compatible",
@@ -107,21 +120,34 @@ fi
 
 # 4b. Pi Agent (~/.pi/agent/models.json)
 if [ ! -f "${HOME}/.pi/agent/models.json" ] || [ "${AGENT_REGENERATE_LOCAL_CONFIG:-0}" = "1" ]; then
-    if [ -n "${OLLAMA_HOST:-}" ] || [ -n "${LOCAL_URL}" ]; then
+    if [ -n "${OLLAMA_HOST:-}" ] || [ -n "${OLLAMA_HOSTS:-}" ] || [ -n "${LOCAL_URL}" ]; then
         jq -n \
             --arg ollama_url "${OLLAMA_HOST:-}" \
+            --arg ollama_hosts "${OLLAMA_HOSTS:-}" \
             --arg local_url "${LOCAL_URL}" \
             --arg local_key "${LOCAL_KEY}" \
             --arg local_model "${LOCAL_MODEL}" '
+            def clean_url: gsub("^\\s+|\\s+$"; "") | sub("/+$"; "");
+            def extra_list:
+                ($ollama_hosts | gsub(";"; ",") | split(",") | map(clean_url) | map(select(length > 0)))
+                | map(select(. != ($ollama_url | clean_url)));
             {"providers": {}}
-            | if $ollama_url != "" then
+            | if ($ollama_url | clean_url) != "" then
                 .providers.ollama = {
-                    "baseUrl": ($ollama_url + "/v1"),
+                    "baseUrl": (($ollama_url | clean_url) + "/v1"),
                     "api": "openai-completions",
                     "apiKey": "ollama",
                     "models": [{"id": $local_model}]
                 }
               else . end
+            | reduce (extra_list | to_entries[]) as $item (.;
+                .providers["ollama-\($item.key + 2)"] = {
+                    "baseUrl": ($item.value + "/v1"),
+                    "api": "openai-completions",
+                    "apiKey": "ollama",
+                    "models": [{"id": $local_model}]
+                }
+              )
             | if $local_url != "" then
                 .providers.local = {
                     "baseUrl": $local_url,

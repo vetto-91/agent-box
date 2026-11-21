@@ -319,6 +319,32 @@ add_env_endpoint_rules() {
     fi
 }
 
+add_env_endpoint_list() {
+    _list_prefix="$1"
+    _list_label="$2"
+    _list_raw="$3"
+    _list_default_port="$4"
+
+    _normalized="$(printf '%s' "${_list_raw}" | tr ';' ',')"
+    _idx=0
+    _old_ifs="${IFS}"
+    IFS=','
+    for _item in ${_normalized}; do
+        IFS="${_old_ifs}"
+        _trimmed="$(printf '%s' "${_item}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [ -n "${_trimmed}" ]; then
+            _idx=$((_idx + 1))
+            if [ "${_idx}" -eq 1 ]; then
+                add_env_endpoint_rules "${_list_prefix}" "${_list_label}" "${_trimmed}" "${_list_default_port}"
+            else
+                add_env_endpoint_rules "${_list_prefix}-${_idx}" "${_list_label}#${_idx}" "${_trimmed}" "${_list_default_port}"
+            fi
+        fi
+        IFS=','
+    done
+    IFS="${_old_ifs}"
+}
+
 if [ "${AUTO_ALLOW_ENV_ENDPOINTS:-1}" = "1" ]; then
     DEFAULT_OLLAMA_PORT="${OLLAMA_PORT:-11434}"
     DEFAULT_OLLAMA_URL="http://host.docker.internal:${DEFAULT_OLLAMA_PORT}"
@@ -327,19 +353,22 @@ if [ "${AUTO_ALLOW_ENV_ENDPOINTS:-1}" = "1" ]; then
     # OPPURE se l'utente ha configurato un endpoint Ollama personalizzato in .env
     if [ -n "${OLLAMA_HOST:-}" ]; then
         if [ "${AUTO_ALLOW_OLLAMA:-1}" = "1" ] || [ "${OLLAMA_HOST}" != "${DEFAULT_OLLAMA_URL}" ]; then
-            add_env_endpoint_rules "010-allow-env-ollama" "OLLAMA_HOST" "${OLLAMA_HOST}" "${DEFAULT_OLLAMA_PORT}"
+            add_env_endpoint_list "010-allow-env-ollama" "OLLAMA_HOST" "${OLLAMA_HOST}" "${DEFAULT_OLLAMA_PORT}"
         fi
     fi
     if [ -n "${OLLAMA_API_BASE:-}" ]; then
         if [ "${AUTO_ALLOW_OLLAMA:-1}" = "1" ] || [ "${OLLAMA_API_BASE}" != "${DEFAULT_OLLAMA_URL}" ]; then
-            add_env_endpoint_rules "011-allow-env-ollama-api" "OLLAMA_API_BASE" "${OLLAMA_API_BASE}" "${DEFAULT_OLLAMA_PORT}"
+            add_env_endpoint_list "011-allow-env-ollama-api" "OLLAMA_API_BASE" "${OLLAMA_API_BASE}" "${DEFAULT_OLLAMA_PORT}"
         fi
     fi
+    if [ -n "${OLLAMA_HOSTS:-}" ]; then
+        add_env_endpoint_list "010-allow-env-ollama-extra" "OLLAMA_HOSTS" "${OLLAMA_HOSTS}" "${DEFAULT_OLLAMA_PORT}"
+    fi
     if [ -n "${LOCAL_LLM_BASE_URL:-}" ]; then
-        add_env_endpoint_rules "012-allow-env-local-llm" "LOCAL_LLM_BASE_URL" "${LOCAL_LLM_BASE_URL}" "80"
+        add_env_endpoint_list "012-allow-env-local-llm" "LOCAL_LLM_BASE_URL" "${LOCAL_LLM_BASE_URL}" "80"
     fi
     if [ -n "${OPENAI_BASE_URL:-}" ]; then
-        add_env_endpoint_rules "013-allow-env-openai-base" "OPENAI_BASE_URL" "${OPENAI_BASE_URL}" "443"
+        add_env_endpoint_list "013-allow-env-openai-base" "OPENAI_BASE_URL" "${OPENAI_BASE_URL}" "443"
     fi
 fi
 

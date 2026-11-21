@@ -128,6 +128,7 @@ Ordine di priorità: **Opzioni CLI > `<cartella_progetto>/.agent-box.env` > vari
 | `AUTO_ALLOW_ENV_ENDPOINTS` | `1` | `1` genera automaticamente regole OpenSnitch ad-hoc (`010..013-allow-env-*`, `precedence: true`) limitate al solo IP/host e porta di `OLLAMA_HOST`, `OLLAMA_API_BASE`, `LOCAL_LLM_BASE_URL` e `OPENAI_BASE_URL`, prioritarie rispetto alle regole restrittive del profilo attivo. |
 | `AUTO_ALLOW_OLLAMA` | `1` | `1` pre-autorizza l'endpoint `OLLAMA_HOST` (solo IP/host + porta esatta); `0` richiede conferma popup per il default `host.docker.internal:11434` (un `OLLAMA_HOST` personalizzato resta comunque prioritario). |
 | `OLLAMA_PORT` | `11434` | Porta di default usata se `OLLAMA_HOST` non specifica esplicitamente una porta. |
+| `OLLAMA_HOSTS` | *(vuoto)* | Server Ollama aggiuntivi contemporanei separati da `,` o `;` (es. `http://192.168.1.50:11434,https://ollama-gpu.lan:8443`). Ogni server riceve una regola prioritaria OpenSnitch dedicata (IP/host + porta) e viene registrato automaticamente in OpenCode/Pi. |
 | `AGENT_MEM_LIMIT` | `8g` | Limite massimo di RAM per il container `agent`. |
 | `AGENT_CPUS` | *(tutti)* | Core CPU per `agent`: vuoto, `0` o `all` usa tutti i core dell'host (`nproc`), altrimenti il numero specificato (limitato a `nproc`). |
 | `AGENT_SHM_SIZE` | `512m` | Dimensione `/dev/shm` per `agent` (utile per applicazioni grafiche, browser ed Electron). |

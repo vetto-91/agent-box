@@ -802,7 +802,7 @@ start_stack() {
     # Esporta le impostazioni di rete da .env e <progetto>/.agent-box.env
     # (priorità: shell env > .agent-box.env > .env) così firewall e agent sono sempre allineati
     local net_var net_val proj_net_val
-    for net_var in AUTO_DNS AUTO_ALLOW_ENV_ENDPOINTS AUTO_ALLOW_OLLAMA OLLAMA_HOST OLLAMA_API_BASE OLLAMA_PORT LOCAL_LLM_BASE_URL OPENAI_BASE_URL; do
+    for net_var in AUTO_DNS AUTO_ALLOW_ENV_ENDPOINTS AUTO_ALLOW_OLLAMA OLLAMA_HOST OLLAMA_API_BASE OLLAMA_HOSTS OLLAMA_PORT LOCAL_LLM_BASE_URL OPENAI_BASE_URL; do
         net_val="${!net_var:-}"
         if [ -z "${net_val}" ]; then
             net_val="$(read_env_var "${SCRIPT_DIR}/.env" "${net_var}")"
