@@ -39,7 +39,11 @@ case "${TOOL}" in
         BIN="${HOME}/.opencode/bin/opencode"
         if [ ! -x "${BIN}" ]; then
             echo "[agent-box] Installazione OpenCode v2 dal sito ufficiale (https://opencode.ai/v2/install) in ${HOME}/.opencode ..."
-            curl -fSL --connect-timeout 15 https://opencode.ai/v2/install | bash -s -- --no-modify-path
+            echo "[agent-box] (Download da opencode.ai e registry.npmjs.org: se appare un popup OpenSnitch, approvalo per continuare)"
+            OC_INSTALLER="${HOME}/.cache/tmp/opencode-v2-install.$$.sh"
+            curl -fSL --connect-timeout 15 -o "${OC_INSTALLER}" https://opencode.ai/v2/install
+            bash "${OC_INSTALLER}" --no-modify-path
+            rm -f "${OC_INSTALLER}"
         fi
         if [ ! -x "${BIN}" ]; then
             echo "[agent-box] ERRORE: eseguibile 'opencode' non trovato in ${BIN} dopo l'installazione." >&2
@@ -85,6 +89,12 @@ case "${TOOL}" in
         if [ ! -x "${BIN}" ]; then
             echo "[agent-box] ERRORE: eseguibile 'hermes' non trovato dopo l'installazione." >&2
             exit 1
+        fi
+        # In container rootless (cap_drop: ALL), "hermes desktop" fallisce sul sudo chown di chrome-sandbox:
+        # delega al launcher GUI isolato che avvia Electron con --no-sandbox.
+        if [ "${1:-}" = "desktop" ] && [ "${AGENT_BOX_HERMES_DIRECT:-0}" != "1" ]; then
+            shift
+            exec /usr/local/bin/agent-gui-launcher hermes-desktop "$@"
         fi
         exec "${BIN}" "$@"
         ;;

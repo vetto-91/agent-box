@@ -76,8 +76,11 @@ LOCAL_MODEL="${LOCAL_LLM_MODEL:-qwen2.5-coder:latest}"
 LOCAL_NAME="${LOCAL_LLM_NAME:-Local LLM}"
 
 # 4a. OpenCode (~/.config/opencode/opencode.json)
-if [ ! -f "${HOME}/.config/opencode/opencode.json" ] || [ "${AGENT_REGENERATE_LOCAL_CONFIG:-0}" = "1" ]; then
-    if [ -n "${OLLAMA_HOST:-}" ] || [ -n "${OLLAMA_HOSTS:-}" ] || [ -n "${LOCAL_URL}" ]; then
+#     Crea il file se manca (o se AGENT_REGENERATE_LOCAL_CONFIG=1), altrimenti sincronizza
+#     in modo non distruttivo i soli baseURL dei provider ollama/ollama-* da .env preservando modelli e altri provider.
+if [ -n "${OLLAMA_HOST:-}" ] || [ -n "${OLLAMA_HOSTS:-}" ] || [ -n "${LOCAL_URL}" ]; then
+    OPENCODE_CFG="${HOME}/.config/opencode/opencode.json"
+    if [ ! -f "${OPENCODE_CFG}" ] || [ "${AGENT_REGENERATE_LOCAL_CONFIG:-0}" = "1" ]; then
         jq -n \
             --arg ollama_url "${OLLAMA_HOST:-}" \
             --arg ollama_hosts "${OLLAMA_HOSTS:-}" \
@@ -114,13 +117,39 @@ if [ ! -f "${HOME}/.config/opencode/opencode.json" ] || [ "${AGENT_REGENERATE_LO
                     "models": { ($local_model): {"name": $local_model} }
                 }
               else . end
-        ' > "${HOME}/.config/opencode/opencode.json"
+        ' > "${OPENCODE_CFG}"
+    elif [ -n "${OLLAMA_HOST:-}" ] || [ -n "${OLLAMA_HOSTS:-}" ]; then
+        jq \
+            --arg ollama_url "${OLLAMA_HOST:-}" \
+            --arg ollama_hosts "${OLLAMA_HOSTS:-}" '
+            def clean_url: gsub("^\\s+|\\s+$"; "") | sub("/+$"; "");
+            def extra_list:
+                ($ollama_hosts | gsub(";"; ",") | split(",") | map(clean_url) | map(select(length > 0)))
+                | map(select(. != ($ollama_url | clean_url)));
+            .provider = (.provider // {})
+            | if ($ollama_url | clean_url) != "" then
+                .provider.ollama = ((.provider.ollama // {
+                    "npm": "@ai-sdk/openai-compatible",
+                    "name": "Ollama (Local)",
+                    "models": {}
+                }) | .options = ((.options // {}) + {"baseURL": (($ollama_url | clean_url) + "/v1")}))
+              else . end
+            | reduce (extra_list | to_entries[]) as $item (.;
+                .provider["ollama-\($item.key + 2)"] = ((.provider["ollama-\($item.key + 2)"] // {
+                    "npm": "@ai-sdk/openai-compatible",
+                    "name": "Ollama #\($item.key + 2) (\($item.value))",
+                    "models": {}
+                }) | .options = ((.options // {}) + {"baseURL": ($item.value + "/v1")}))
+              )
+        ' "${OPENCODE_CFG}" > "${OPENCODE_CFG}.tmp" 2>/dev/null && mv -f "${OPENCODE_CFG}.tmp" "${OPENCODE_CFG}" || rm -f "${OPENCODE_CFG}.tmp"
     fi
 fi
 
 # 4b. Pi Agent (~/.pi/agent/models.json)
-if [ ! -f "${HOME}/.pi/agent/models.json" ] || [ "${AGENT_REGENERATE_LOCAL_CONFIG:-0}" = "1" ]; then
-    if [ -n "${OLLAMA_HOST:-}" ] || [ -n "${OLLAMA_HOSTS:-}" ] || [ -n "${LOCAL_URL}" ]; then
+#     Sincronizza in modo non distruttivo i baseUrl di ollama/ollama-* da .env preservando i modelli configurati dall'utente (es. gemma4:e4b)
+if [ -n "${OLLAMA_HOST:-}" ] || [ -n "${OLLAMA_HOSTS:-}" ] || [ -n "${LOCAL_URL}" ]; then
+    PI_MODELS="${HOME}/.pi/agent/models.json"
+    if [ ! -f "${PI_MODELS}" ] || [ "${AGENT_REGENERATE_LOCAL_CONFIG:-0}" = "1" ]; then
         jq -n \
             --arg ollama_url "${OLLAMA_HOST:-}" \
             --arg ollama_hosts "${OLLAMA_HOSTS:-}" \
@@ -156,7 +185,32 @@ if [ ! -f "${HOME}/.pi/agent/models.json" ] || [ "${AGENT_REGENERATE_LOCAL_CONFI
                     "models": [{"id": $local_model}]
                 }
               else . end
-        ' > "${HOME}/.pi/agent/models.json"
+        ' > "${PI_MODELS}"
+    elif [ -n "${OLLAMA_HOST:-}" ] || [ -n "${OLLAMA_HOSTS:-}" ]; then
+        jq \
+            --arg ollama_url "${OLLAMA_HOST:-}" \
+            --arg ollama_hosts "${OLLAMA_HOSTS:-}" \
+            --arg local_model "${LOCAL_MODEL}" '
+            def clean_url: gsub("^\\s+|\\s+$"; "") | sub("/+$"; "");
+            def extra_list:
+                ($ollama_hosts | gsub(";"; ",") | split(",") | map(clean_url) | map(select(length > 0)))
+                | map(select(. != ($ollama_url | clean_url)));
+            .providers = (.providers // {})
+            | if ($ollama_url | clean_url) != "" then
+                .providers.ollama = ((.providers.ollama // {
+                    "api": "openai-completions",
+                    "apiKey": "ollama",
+                    "models": [{"id": $local_model}]
+                }) + {"baseUrl": (($ollama_url | clean_url) + "/v1")})
+              else . end
+            | reduce (extra_list | to_entries[]) as $item (.;
+                .providers["ollama-\($item.key + 2)"] = ((.providers["ollama-\($item.key + 2)"] // {
+                    "api": "openai-completions",
+                    "apiKey": "ollama",
+                    "models": [{"id": $local_model}]
+                }) + {"baseUrl": ($item.value + "/v1")})
+              )
+        ' "${PI_MODELS}" > "${PI_MODELS}.tmp" 2>/dev/null && mv -f "${PI_MODELS}.tmp" "${PI_MODELS}" || rm -f "${PI_MODELS}.tmp"
     fi
 fi
 

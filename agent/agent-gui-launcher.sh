@@ -88,14 +88,18 @@ case "${APP_NAME}" in
         fi
         ;;
     opencode-desktop|opencode-gui)
-        if [ -x /opt/OpenCode/ai.opencode.desktop ]; then
-            exec /opt/OpenCode/ai.opencode.desktop "${COMMON_ELECTRON_FLAGS[@]}" "$@"
-        elif [ -x /usr/bin/ai.opencode.desktop ]; then
-            exec /usr/bin/ai.opencode.desktop "${COMMON_ELECTRON_FLAGS[@]}" "$@"
-        else
-            export BROWSER="/usr/local/bin/agent-webapp-open"
-            exec opencode web "$@"
-        fi
+        for oc_bin in \
+            /opt/OpenCode/ai.opencode.desktop \
+            /opt/OpenCode/opencode-desktop \
+            /opt/OpenCode/opencode \
+            /usr/bin/ai.opencode.desktop \
+            /usr/bin/opencode-desktop; do
+            if [ -x "${oc_bin}" ]; then
+                exec "${oc_bin}" "${COMMON_ELECTRON_FLAGS[@]}" "$@"
+            fi
+        done
+        export BROWSER="/usr/local/bin/agent-webapp-open"
+        exec opencode web "$@"
         ;;
     opencode-web)
         export BROWSER="/usr/local/bin/agent-webapp-open"
@@ -133,7 +137,31 @@ case "${APP_NAME}" in
         launch_terminal_gui "Pi Coding Agent" pi "$@"
         ;;
     hermes-desktop|hermes-gui)
-        exec hermes desktop "$@"
+        HERMES_UNPACKED="${HOME}/.hermes/hermes-agent/apps/desktop/release/linux-unpacked"
+        find_hermes_electron() {
+            for cand in "${HERMES_UNPACKED}/hermes" "${HERMES_UNPACKED}/Hermes" "${HERMES_UNPACKED}/hermes-desktop"; do
+                if [ -x "${cand}" ] && [ ! -d "${cand}" ]; then
+                    printf '%s' "${cand}"
+                    return 0
+                fi
+            done
+            if [ -d "${HERMES_UNPACKED}" ]; then
+                find "${HERMES_UNPACKED}" -maxdepth 1 -type f -executable \
+                    ! -name 'chrome-sandbox' ! -name 'chrome_crashpad_handler' ! -name '*.so*' \
+                    -print -quit 2>/dev/null || true
+            fi
+        }
+        HERMES_BIN="$(find_hermes_electron || true)"
+        if [ -z "${HERMES_BIN}" ]; then
+            # Compila/aggiorna il pacchetto desktop Electron (nel container rootless il passo finale chown chrome-sandbox fallisce: è atteso)
+            AGENT_BOX_HERMES_DIRECT=1 hermes desktop || true
+            HERMES_BIN="$(find_hermes_electron || true)"
+        fi
+        if [ -n "${HERMES_BIN}" ] && [ -x "${HERMES_BIN}" ]; then
+            exec "${HERMES_BIN}" "${COMMON_ELECTRON_FLAGS[@]}" "$@"
+        fi
+        echo "[agent-box] ERRORE: binario Electron di Hermes Desktop non trovato in ${HERMES_UNPACKED}." >&2
+        exit 1
         ;;
     agent-webapp-open)
         launch_webapp "webapp" "AgentBoxWebApp" "${1:-http://127.0.0.1:8501}"
