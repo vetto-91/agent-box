@@ -497,20 +497,8 @@ generate_runtime_override() {
         fi
     fi
 
-    # Risolvi dispositivi Audio / Microfono (sempre isolati tramite FIFO PCM unidirezionali,
-    # senza mai esporre il socket PulseAudio/PipeWire dell'host o i device di cattura /dev/snd/pcmC*D*c ad agent)
-    if [ "${enable_audio}" -eq 1 ]; then
-        if [ -d /dev/snd ]; then
-            for snd_dev in /dev/snd/controlC* /dev/snd/pcmC*D*p /dev/snd/timer /dev/snd/seq; do
-                if [ -c "${snd_dev}" ]; then
-                    devices_list+=("${snd_dev}:${snd_dev}")
-                fi
-            done
-            while IFS= read -r gid; do
-                [ -n "${gid}" ] && [ "${gid}" != "0" ] && group_gids+=("${gid}")
-            done < <(find /dev/snd -maxdepth 1 -type c -exec stat -c '%g' {} + 2>/dev/null | sort -u || true)
-        fi
-    fi
+    # Audio / Microfono: completamente isolati tramite bridge FIFO PCM unidirezionali in /run/agent-audio
+    # (nessun accesso diretto a /dev/snd/* né al socket PulseAudio/PipeWire dell'host da parte di agent)
 
     # Deduplica GIDs
     local unique_gids=()

@@ -184,8 +184,8 @@ services:
     volumes:
       # UNICA directory del filesystem host esposta all'agente:
       - ${WORKSPACE_DIR:-./workspace}:/workspace:rw
-      # File hosts modificabile dall'host (./hosts) e dall'agente (/etc/hosts):
-      - ./hosts:/etc/hosts:rw
+      # File hosts modificabile dall'host (./hosts), in sola lettura dentro l'agente:
+      - ./hosts:/etc/hosts:ro
       # Certificati CA personalizzati/self-signed per endpoint HTTPS locali:
       - ./certs:/etc/agent-box/certs:ro
       # Home persistente isolata (tutta dentro la cartella del progetto):
