@@ -48,6 +48,17 @@ if ! mkdir -p \
         "${HOME}/.gemini"
 fi
 
+# 2b. Migrazione automatica vecchia installazione uv di Hermes (priva di apps/desktop)
+#     Se ~/.local/bin/hermes punta a uv/tools/hermes-agent e manca ~/.hermes/hermes-agent,
+#     rimuove il vecchio shim così il wrapper /usr/local/bin/hermes usa l'installer ufficiale curl (--include-desktop).
+if [ -e "${HOME}/.local/bin/hermes" ] && [ ! -d "${HOME}/.hermes/hermes-agent" ]; then
+    if grep -q "uv/tools/hermes-agent" "${HOME}/.local/bin/hermes" 2>/dev/null || \
+       readlink -f "${HOME}/.local/bin/hermes" 2>/dev/null | grep -q "uv/tools/hermes-agent"; then
+        rm -f "${HOME}/.local/bin/hermes"
+        echo "[agent-box] Rimosso vecchio shim uv di Hermes (~/.local/bin/hermes): al prossimo 'hermes' verrà installata la versione ufficiale completa (--include-desktop)."
+    fi
+fi
+
 # 3. Configura prompt sandbox e supporto TLS opzionale in .bashrc
 if [ ! -f "${HOME}/.bashrc" ] || ! grep -q "AGENT-BOX" "${HOME}/.bashrc" 2>/dev/null; then
     cat <<'EOF' >> "${HOME}/.bashrc"

@@ -194,6 +194,7 @@ services:
       - ./agent/agent-apt.sh:/usr/local/bin/sudo:ro
       - ./agent/agent-apt.sh:/usr/local/bin/apt:ro
       - ./agent/agent-apt.sh:/usr/local/bin/apt-get:ro
+      - ./agent/agent-tools-wrapper.sh:/usr/local/bin/claude:ro
       - ./agent/agent-tools-wrapper.sh:/usr/local/bin/opencode:ro
       - ./agent/agent-tools-wrapper.sh:/usr/local/bin/pi:ro
       - ./agent/agent-tools-wrapper.sh:/usr/local/bin/hermes:ro

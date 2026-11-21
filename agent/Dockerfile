@@ -68,14 +68,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 2. Installa uv (package/tool manager Python velocissimo per Aider e ambienti virtuali)
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
 
-# 3. Pre-installa CLI degli agenti AI globalmente in /usr/local
-#    (Claude Code, OpenAI Codex/ChatGPT, xAI Grok, Gemini CLI; OpenCode, Pi e Hermes usano gli installer ufficiali curl in $HOME)
-RUN npm install -g \
-    @anthropic-ai/claude-code \
+# 3. Aggiorna npm (da 9.x Ubuntu a npm 11 compatibile con Node 22 in /usr/local/bin/npm) e pre-installa le CLI distribuite via npm
+#    (OpenAI Codex/ChatGPT, xAI Grok, Gemini CLI; Claude Code, OpenCode, Pi e Hermes usano gli installer ufficiali curl in $HOME)
+RUN npm install -g npm@11 && \
+    /usr/local/bin/npm install -g \
     @openai/codex \
     @xai-official/grok \
     @google/gemini-cli \
-    && npm cache clean --force
+    && /usr/local/bin/npm cache clean --force
 
 # 3b. Installa Antigravity CLI (agy) se raggiungibile al build, altrimenti wrapper lazy al primo avvio
 RUN (curl -fsSL https://antigravity.google/cli/install.sh | env HOME=/opt/agy-install bash && \
@@ -97,9 +97,10 @@ RUN if [ "${INSTALL_AIDER_AT_BUILD}" = "1" ]; then \
         chmod +x /usr/local/bin/aider; \
     fi
 
-# 4b. Wrapper per Hermes Agent, OpenCode e Pi Agent (installati tramite script curl ufficiali in $HOME)
+# 4b. Wrapper per Claude Code, Hermes Agent, OpenCode e Pi Agent (installati tramite script curl ufficiali in $HOME)
 COPY agent-tools-wrapper.sh /usr/local/bin/agent-tools-wrapper
 RUN chmod +x /usr/local/bin/agent-tools-wrapper && \
+    ln -sf /usr/local/bin/agent-tools-wrapper /usr/local/bin/claude && \
     ln -sf /usr/local/bin/agent-tools-wrapper /usr/local/bin/opencode && \
     ln -sf /usr/local/bin/agent-tools-wrapper /usr/local/bin/pi && \
     ln -sf /usr/local/bin/agent-tools-wrapper /usr/local/bin/hermes
@@ -133,7 +134,9 @@ RUN set -eux; \
         fonts-liberation; \
     ARCH="$(dpkg --print-architecture)"; \
     if [ "${ARCH}" = "amd64" ] || [ "${ARCH}" = "arm64" ]; then \
-        curl -fsSL -o /tmp/opencode-desktop.deb "https://github.com/anomalyco/opencode/releases/latest/download/opencode-desktop-linux-${ARCH}.deb" && \
+        OPENCODE_DEB_URL="$(curl -fsSL https://api.github.com/repos/anomalyco/opencode/releases?per_page=10 | jq -r --arg arch "${ARCH}" '[.[] | select(.prerelease == false and (.tag_name | startswith("v2.")))][0].assets[] | select(.name == "opencode-desktop-linux-" + $arch + ".deb") | .browser_download_url' 2>/dev/null | head -n 1)"; \
+        [ -n "${OPENCODE_DEB_URL}" ] || OPENCODE_DEB_URL="https://github.com/anomalyco/opencode/releases/latest/download/opencode-desktop-linux-${ARCH}.deb"; \
+        curl -fsSL -o /tmp/opencode-desktop.deb "${OPENCODE_DEB_URL}" && \
         apt-get install -y --no-install-recommends /tmp/opencode-desktop.deb && \
         rm -f /tmp/opencode-desktop.deb; \
     fi; \
