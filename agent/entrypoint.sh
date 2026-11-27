@@ -59,13 +59,29 @@ if [ -e "${HOME}/.local/bin/hermes" ] && [ ! -d "${HOME}/.hermes/hermes-agent" ]
     fi
 fi
 
-# 3. Configura prompt sandbox e supporto TLS opzionale in .bashrc
+# 2c. Rimuove eventuali binari GUI estratti nel sysroot che scavalcherebbero /usr/local/bin/* (--no-sandbox)
+#     (agent-gui-launcher usa comunque i binari aggiornati dentro ~/.local/sysroot/usr/lib/... con --no-sandbox)
+rm -f \
+    "${HOME}/.local/sysroot/usr/bin/claude-desktop" \
+    "${HOME}/.local/sysroot/usr/bin/chatgpt" \
+    "${HOME}/.local/sysroot/usr/bin/opencode-desktop" \
+    "${HOME}/.local/sysroot/usr/bin/ai.opencode" \
+    "${HOME}/.local/sysroot/usr/bin/ai.opencode.desktop" 2>/dev/null || true
+
+# 3. Configura prompt sandbox, TMPDIR/BUN_TMPDIR eseguibile (per opencode/opencode2/claude) e supporto TLS in .bashrc
 if [ ! -f "${HOME}/.bashrc" ] || ! grep -q "AGENT-BOX" "${HOME}/.bashrc" 2>/dev/null; then
     cat <<'EOF' >> "${HOME}/.bashrc"
 
 # --- AGENT-BOX SANDBOX PROMPT ---
 export PS1='\[\033[1;31m\][🔒 agent-box]\[\033[0m\] \[\033[1;34m\]\w\[\033[0m\]\$ '
 alias ll='ls -la --color=auto'
+EOF
+fi
+if ! grep -q "BUN_TMPDIR" "${HOME}/.bashrc" 2>/dev/null; then
+    cat <<'EOF' >> "${HOME}/.bashrc"
+export TMPDIR="${HOME}/.cache/tmp"
+export BUN_TMPDIR="${HOME}/.cache/tmp"
+[ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ] && export XLIB_SKIP_ARGB_VISUALS=1
 EOF
 fi
 
@@ -283,7 +299,7 @@ if [ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ] && [ -n "${DISPLAY:-}" ] && command -v
     <number>1</number>
   </desktops>
   <resize>
-    <drawContents>yes</drawContents>
+    <drawContents>no</drawContents>
   </resize>
   <keyboard>
     <keybind key="A-Tab"><action name="NextWindow"/></keybind>

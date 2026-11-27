@@ -58,6 +58,15 @@ COMMON_ELECTRON_FLAGS=(
     "--password-store=gnome-libsecret"
     "--ozone-platform-hint=${OZONE_HINT}"
 )
+# Dentro il monitor virtuale Xephyr (:99) disabilita il compositing GPU e gli ARGB visuals:
+# elimina rettangoli neri, artefatti al resize e glitch grafici di Electron/Chromium su Xephyr
+if [ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ]; then
+    export XLIB_SKIP_ARGB_VISUALS=1
+    COMMON_ELECTRON_FLAGS+=(
+        "--disable-gpu-compositing"
+        "--disable-dev-shm-usage"
+    )
+fi
 
 launch_webapp() {
     local profile_name="$1"
@@ -100,21 +109,29 @@ launch_terminal_gui() {
 
 case "${APP_NAME}" in
     claude-desktop|claude-gui)
-        if [ -x /usr/lib/claude-desktop/claude-desktop ]; then
-            exec /usr/lib/claude-desktop/claude-desktop "${COMMON_ELECTRON_FLAGS[@]}" "$@"
-        else
-            launch_webapp "claude" "ClaudeDesktop" "https://claude.ai" "$@"
-        fi
+        for claude_bin in \
+            "${HOME}/.local/sysroot/usr/lib/claude-desktop/claude-desktop" \
+            /usr/lib/claude-desktop/claude-desktop; do
+            if [ -x "${claude_bin}" ]; then
+                exec "${claude_bin}" "${COMMON_ELECTRON_FLAGS[@]}" "$@"
+            fi
+        done
+        launch_webapp "claude" "ClaudeDesktop" "https://claude.ai" "$@"
         ;;
     chatgpt-desktop|chatgpt-gui|codex-desktop|codex-gui)
-        if [ -x /usr/bin/chatgpt ]; then
-            exec /usr/bin/chatgpt "${COMMON_ELECTRON_FLAGS[@]}" "$@"
-        else
-            launch_webapp "chatgpt" "ChatGPTDesktop" "https://chatgpt.com" "$@"
-        fi
+        for chatgpt_bin in \
+            "${HOME}/.local/sysroot/usr/lib/chatgpt/chatgpt" \
+            /usr/bin/chatgpt; do
+            if [ -x "${chatgpt_bin}" ]; then
+                exec "${chatgpt_bin}" "${COMMON_ELECTRON_FLAGS[@]}" "$@"
+            fi
+        done
+        launch_webapp "chatgpt" "ChatGPTDesktop" "https://chatgpt.com" "$@"
         ;;
     opencode-desktop|opencode-gui)
         for oc_bin in \
+            "${HOME}/.local/sysroot/opt/OpenCode/ai.opencode" \
+            "${HOME}/.local/sysroot/opt/OpenCode/ai.opencode.desktop" \
             /opt/OpenCode/ai.opencode \
             /opt/OpenCode/ai.opencode.desktop \
             /opt/OpenCode/opencode-desktop \

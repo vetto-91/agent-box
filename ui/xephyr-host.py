@@ -126,6 +126,8 @@ class XephyrHostWindow(QtWidgets.QMainWindow):
             "+extension", "RANDR",
             "+extension", "GLX",
             "+extension", "RENDER",
+            "+extension", "DAMAGE",
+            "+extension", "COMPOSITE",
         ]
         self.xephyr_proc = subprocess.Popen(cmd)
 

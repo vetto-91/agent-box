@@ -186,6 +186,13 @@ case "${SUBCMD}" in
 
         if [ "${DEB_COUNT}" -gt 0 ]; then
             fix_sysroot_links_and_pkgconfig
+            # Non lasciare in sysroot/usr/bin wrapper GUI che scavalcano /usr/local/bin/* (--no-sandbox)
+            rm -f \
+                "${SYSROOT}/usr/bin/claude-desktop" \
+                "${SYSROOT}/usr/bin/chatgpt" \
+                "${SYSROOT}/usr/bin/opencode-desktop" \
+                "${SYSROOT}/usr/bin/ai.opencode" \
+                "${SYSROOT}/usr/bin/ai.opencode.desktop" 2>/dev/null || true
             rm -f "${APT_TMP}/cache/archives/"*.deb
             echo "[agent-apt] Installati ${DEB_COUNT} pacchetti in ${SYSROOT} (persistenti in ./agent-home)."
         else
