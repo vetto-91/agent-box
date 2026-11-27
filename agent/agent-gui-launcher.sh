@@ -58,12 +58,11 @@ COMMON_ELECTRON_FLAGS=(
     "--password-store=gnome-libsecret"
     "--ozone-platform-hint=${OZONE_HINT}"
 )
-# Dentro il monitor virtuale Xephyr (:99) disabilita il compositing GPU e gli ARGB visuals:
-# elimina rettangoli neri, artefatti al resize e glitch grafici di Electron/Chromium su Xephyr
+# Dentro il monitor virtuale Xephyr (:99) evita ARGB visuals e limita /dev/shm:
+# riduce rettangoli neri e artefatti su Xephyr mantenendo attiva l'accelerazione GPU
 if [ "${AGENT_XEPHYR_ENABLED:-0}" = "1" ]; then
     export XLIB_SKIP_ARGB_VISUALS=1
     COMMON_ELECTRON_FLAGS+=(
-        "--disable-gpu-compositing"
         "--disable-dev-shm-usage"
     )
 fi
